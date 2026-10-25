@@ -12,7 +12,7 @@ async function page(browser, opts = {}) {
   await p.clock.setFixedTime(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 10, 30));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(`[console] ${m.text()}`); });
   p.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));
-  await p.goto(url); await p.waitForSelector('#rail .nav-item', { timeout: 15000 }); await p.waitForTimeout(200);
+  await p.goto(url); await p.waitForSelector(opts.ready || '#rail .nav-item', { timeout: 15000 }); await p.waitForTimeout(200);
   return { ctx, p };
 }
 (async () => {
@@ -122,7 +122,7 @@ async function page(browser, opts = {}) {
   await d.p.click('[data-act="go"][data-view="reports"]'); await d.p.waitForTimeout(200); await d.p.screenshot({ path: `${OUT}/13-reports-dark.png` });
   await d.p.click('[data-act="go"][data-view="clients"]'); await d.p.click('#client-list .client-row'); await d.p.waitForTimeout(150); await d.p.screenshot({ path: `${OUT}/14-client-dark.png` });
   // phone
-  const m = await page(browser, { viewport: { width: 390, height: 844 }, touch: true });
+  const m = await page(browser, { viewport: { width: 390, height: 844 }, touch: true, ready: '.tabbar [data-view]' });
   await m.p.waitForSelector('[data-appt]'); await m.p.screenshot({ path: `${OUT}/15-phone-calendar.png` });
   const overflow = await m.p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   console.log(overflow > 0 ? `FAIL  phone horizontal overflow ${overflow}px` : 'ok    no horizontal overflow on phone');
