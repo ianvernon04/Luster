@@ -1,8 +1,9 @@
 /* ===== Boot ===== */
 (async function boot() {
-  await loadState();
+  if (!applySetupLink()) await loadState();   // a setup link may have just created and selected the business itself
   S.ui = defaultUI();
   App.render();
+  installHint();
   // the clock: keep today's seeded appointments honest and move the now-line
   setInterval(() => {
     refreshTodayStatuses();

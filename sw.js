@@ -1,4 +1,4 @@
-/* Luster service worker — build 4e0a6d87ae (2026-10-25T11:09Z) */
+/* Luster service worker — build 4e0a6d87ae (2026-10-25T11:25Z) */
 const CACHE = 'luster-4e0a6d87ae';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

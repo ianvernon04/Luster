@@ -185,6 +185,7 @@ img, svg, canvas { max-width: 100%; }
 .search svg { width: 16px; height: 16px; color: var(--ink-3); flex: none; }
 .search input { border: 0; background: transparent; flex: 1; min-width: 0; padding: 6px 0; outline: none; }
 .search kbd { font-family: var(--font-ui); font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+@media (hover: none) { .search kbd { display: none; } }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; min-height: 28px; }
 .chip:hover { background: var(--surface-2); }
@@ -326,6 +327,12 @@ img, svg, canvas { max-width: 100%; }
 .toast.good::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
 .toast.bad::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
 .toast .btn { margin-left: auto; color: var(--surface); border-color: transparent; background: rgba(255,255,255,0.12); }
+.install-hint { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 65; width: min(520px, calc(100vw - 24px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-3); padding: 10px 10px 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; animation: rise .22s ease; }
+.install-hint-text { flex: 1; min-width: 0; line-height: 1.35; }
+.install-hint-text .ic { width: 16px; height: 16px; vertical-align: -3px; color: var(--accent); }
+.install-hint .btn.ghost { padding: 4px; min-height: 28px; }
+.install-hint .btn.ghost .ic { width: 16px; height: 16px; }
+@media (max-width: 860px) { .install-hint { bottom: calc(68px + env(safe-area-inset-bottom, 0px)); } }
 .palette { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; padding: min(12vh, 110px) 16px 16px; animation: fade .12s ease; }
 .palette-box { width: min(620px, 100%); background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-3); overflow: hidden; animation: rise .16s ease; }
 .palette-input { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line-2); }

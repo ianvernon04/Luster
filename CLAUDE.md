@@ -3,23 +3,6 @@
 Single-file, local-first web app (vanilla JS, no framework, no build tooling beyond bash). The repo root is
 deployed as-is by GitHub Pages, so **the built `index.html` and `sw.js` at the root are committed**.
 
-## If the source sits flat at the repo root, restore the layout first
-
-The source was uploaded through GitHub's web UI on 2026-10-25 and may still sit **flat at the repo root** (the part
-files, `build.sh`, `build-pwa.sh`, `icons.js`, `run.js`, `ws.js`, `setup.js`, `pwa.js` next to `index.html`). The live
-site is unaffected, but the scripts expect the `src/` layout below. If `ls src` fails, run:
-
-```
-mkdir -p src/parts src/test
-git mv 00-head.html 10-styles.css 20-markup.html 3*.js 4*.js 50-app.js src/parts/
-git mv build.sh build-pwa.sh icons.js src/
-git mv run.js ws.js setup.js pwa.js src/test/
-chmod +x src/build.sh src/build-pwa.sh
-git commit -m "Restore src/ layout"
-```
-
-Then delete this section.
-
 ## Commands
 
 - Build the artifact fragment + standalone test page: `cd src && ./build.sh`
