@@ -19,6 +19,17 @@ Open the Pages URL for this repo (Settings → Pages shows it; for `ianvernon04/
 Demo build: all data stays on the device (IndexedDB). Nothing is sent anywhere. Payments and texting are
 simulated. Seeded demo data regenerates around today's date; anything you create yourself is kept.
 
+## Personalized install links
+
+Add the business to the link and the app opens straight into it — and keeps it after Add to Home Screen:
+
+```
+https://www.nwluster.com/?biz=hair&name=Magnolia%20Hair%20Studio&owner=Renee&team=5
+```
+
+`biz` is one of `facial`, `hair`, `lash`, `nails`, `massage`, `medspa`, `barber`; `name`, `owner`, `team` (2–6),
+`phone` and `address` are optional. The same link always opens the same business on that device.
+
 ## Update the live app
 
 1. Make the change in `src/parts/`.
@@ -36,7 +47,8 @@ manifest.webmanifest, *.png  static PWA assets
 src/parts/                   the source, concatenated in filename order
 src/build.sh                 parts → src/index.html (fragment) + src/test/page.html (standalone page)
 src/build-pwa.sh             full installable build → repo root
-src/test/run.js, ws.js       Playwright smoke tests (screenshots land in src/test/shots/)
+src/icons.js                 renders the icon PNGs from one vector mark
+src/test/                    Playwright tests: run.js, ws.js (UI), setup.js (links), pwa.js (install build)
 ```
 
 ## Run the tests
@@ -44,5 +56,5 @@ src/test/run.js, ws.js       Playwright smoke tests (screenshots land in src/tes
 ```
 cd src && ./build.sh
 npm i playwright@1.63.0 && npx playwright install chromium
-node test/run.js && node test/ws.js
+node test/run.js && node test/ws.js && node test/setup.js && node test/pwa.js
 ```
