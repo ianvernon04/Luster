@@ -2,7 +2,8 @@
 const WS_INDEX_KEY = 'luster.ws.index', WS_CUR_KEY = 'luster.ws.current';
 let LS_KEY = '';
 const S = { state: null, ui: null, photoUrls: new Map(), wsId: null };
-const wsKey = (id) => `luster.ws.${id}.v${SEED_VERSION}`;
+// Demo workspaces reseed when SEED_VERSION changes. Live workspaces hold real data, so their key never changes.
+const wsKey = (id) => { const w = (S.wsIndex || []).find((x) => x.id === id); return w && w.live ? `luster.live.${id}` : `luster.ws.${id}.v${SEED_VERSION}`; };
 function loadIndex() { try { const i = JSON.parse(localStorage.getItem(WS_INDEX_KEY) || '[]'); return Array.isArray(i) && i.length ? i : null; } catch (e) { return null; } }
 function saveIndex(idx) { try { localStorage.setItem(WS_INDEX_KEY, JSON.stringify(idx)); } catch (e) {} }
 function workspaces() { return S.wsIndex || (S.wsIndex = loadIndex() || [{ id: 'simply', name: TEMPLATES.facial.defaults.name, templateId: 'facial', opts: {}, createdAt: todayStr() }]); }
@@ -24,8 +25,17 @@ async function loadState() {
   const ws = idx.find((w) => w.id === cur) || idx[0]; S.wsId = ws.id; LS_KEY = wsKey(ws.id);
   let st = null;
   try { st = await KV.get(LS_KEY); if (st && typeof st === 'string') st = JSON.parse(st); } catch (e) { st = null; }
-  if (!st || st.version !== SEED_VERSION) st = buildInitialState(ws.templateId, ws.opts || {});
-  else { syncCategories(st.categories); refreshSeededActivity(st); }
+  if (ws.live) {
+    // a real business: never reseeded, never thrown away; the cloud fills in anything missing
+    if (!st) st = emptyLiveState(ws, null, null);
+    st.live = { ...st.live, businessId: ws.live.businessId, slug: st.live?.slug || ws.live.slug, timezone: st.live?.timezone || ws.live.timezone };
+    st.live.ids ||= { staff: {}, services: {} }; st.live.synced ||= { appt: {}, client: {} };
+    APP_TZ = st.live.timezone; syncCategories(st.categories);
+  } else {
+    APP_TZ = null;
+    if (!st || st.version !== SEED_VERSION) st = buildInitialState(ws.templateId, ws.opts || {});
+    else { syncCategories(st.categories); refreshSeededActivity(st); }
+  }
   S.state = st; st.refunds ||= []; st.clients.forEach((c) => { c.storeCredit ||= 0; }); syncCategories(st.categories); invalidateIndex();
   refreshTodayStatuses();
   try { localStorage.setItem(WS_CUR_KEY, ws.id); } catch (e) {}
@@ -33,15 +43,21 @@ async function loadState() {
 }
 const saveState = debounce(() => { KV.set(LS_KEY, S.state).catch(() => {}); }, 200);
 const saveNow = () => KV.set(LS_KEY, S.state);
-function resetDemo() { const ws = currentWs(); S.state = buildInitialState(ws.templateId, ws.opts || {}); S.state.refunds ||= []; invalidateIndex(); refreshTodayStatuses(); saveState(); }
+function resetDemo() { const ws = currentWs(); if (ws.live) return; S.state = buildInitialState(ws.templateId, ws.opts || {}); S.state.refunds ||= []; invalidateIndex(); refreshTodayStatuses(); saveState(); }
 function createWorkspace(templateId, opts) {
+  Cloud.stop(); APP_TZ = null;
   const idx = workspaces(); const id = uid('ws_'); const name = (opts.name || '').trim() || TEMPLATES[templateId].defaults.name;
   idx.push({ id, name, templateId, opts: { ...opts, name }, createdAt: todayStr() }); saveIndex(idx);
   try { localStorage.setItem(WS_CUR_KEY, id); } catch (e) {}
   S.wsId = id; LS_KEY = wsKey(id); S.state = buildInitialState(templateId, opts); invalidateIndex(); refreshTodayStatuses(); saveState();
   return idx[idx.length - 1];
 }
-async function switchWorkspace(id) { if (!workspaces().some((w) => w.id === id)) return; await saveNow().catch(() => {}); try { localStorage.setItem(WS_CUR_KEY, id); } catch (e) {} S.photoUrls = new Map(); await loadState(); }
+async function switchWorkspace(id) {
+  if (!workspaces().some((w) => w.id === id)) return;
+  await Cloud.idle(); Cloud.stop();   // finish any sync for the business we're leaving before swapping its data out
+  await saveNow().catch(() => {}); try { localStorage.setItem(WS_CUR_KEY, id); } catch (e) {} S.photoUrls = new Map(); await loadState();
+  if (isLive()) Cloud.start();
+}
 function deleteWorkspace(id) { const idx = workspaces(); if (idx.length <= 1 || id === S.wsId) return; S.wsIndex = idx.filter((w) => w.id !== id); saveIndex(S.wsIndex); KV.del(wsKey(id)); }
 
 function defaultUI() {
@@ -84,8 +100,8 @@ const apptById = (id) => st().appointments.find((a) => a.id === id);
 const planById = (id) => st().plans.find((p) => p.id === id);
 const tplById = (id) => st().formTemplates.find((t) => t.id === id);
 const fullName = (c) => c ? `${c.first} ${c.last}` : 'Unknown';
-const apptTitle = (a) => a.items.map((i) => svcById(i.serviceId)?.name || '—').join(' + ');
-const apptMainCat = (a) => svcById(a.items[0].serviceId)?.cat || CAT_ORDER[0];
+const apptTitle = (a) => a.items.map((i) => svcById(i.serviceId)?.name || '—').join(' + ') || 'Blocked time';
+const apptMainCat = (a) => (a.items[0] && svcById(a.items[0].serviceId)?.cat) || CAT_ORDER[0];
 const apptEnd = (a) => a.start + a.dur;
 const bookableStaff = () => st().staff.filter((s) => s.bookable);
 const STATUS_LABEL = { booked: 'Booked', confirmed: 'Confirmed', checkedin: 'Checked in', inservice: 'In service', completed: 'Completed', noshow: 'No-show', cancelled: 'Cancelled' };
@@ -145,7 +161,7 @@ function searchClients(q, limit = 50) {
 }
 
 /* ---- mutations (every one of them saves) ---- */
-function commit() { invalidateIndex(); saveState(); }
+function commit() { invalidateIndex(); saveState(); if (isLive()) Cloud.soon(); }
 function setStatus(apptId, status) {
   const a = apptById(apptId); if (!a) return; a.status = status; a.touched = true;
   if (status === 'checkedin') a.arrivedAt = new Date().toISOString();
@@ -153,9 +169,9 @@ function setStatus(apptId, status) {
 }
 function createAppointment({ clientId, staffId, date, start, items, notes = '', source = 'front_desk', status = 'booked' }) {
   const dur = sum(items, (i) => i.dur);
-  const a = { id: uid('a_'), clientId, staffId, date, start, items, dur, status, notes, source, createdAt: todayStr(), seeded: false };
+  const a = { id: newId('a_'), clientId, staffId, date, start, items, dur, status, notes, source, createdAt: todayStr(), seeded: false };
   st().appointments.push(a);
-  if (st().settings.reminders.confirmOnBooking) {
+  if (st().settings.reminders.confirmOnBooking && !isLive()) {   // a live business sends its own (see 47-handoff.js)
     const c = clientById(clientId); const sname = staffById(staffId).name.split(' ')[0];
     st().messages.push({ id: uid('m_'), clientId, appointmentId: a.id, channel: source === 'online' ? 'email' : 'sms', kind: 'confirmation', body: `You're booked: ${apptTitle(a)} with ${sname} on ${fmtDate(date, 'dow')} at ${fmtTime(start)}. Need to change it? Reply to this message.`, at: new Date().toISOString(), status: 'delivered', reply: null, seeded: false });
     void c;
@@ -163,9 +179,9 @@ function createAppointment({ clientId, staffId, date, start, items, notes = '', 
   // consent forms needed?
   for (const it of items) {
     const need = (st().consentFor || {})[it.serviceId]; if (!need) continue;
-    if (!st().forms.some((f) => f.clientId === clientId && f.templateId === need && (f.status === 'sent' || (f.status === 'completed' && diffDays(f.date, date) < 365)))) st().forms.push({ id: uid('f_'), clientId, templateId: need, status: 'sent', sentAt: todayStr(), date: null, answers: null, appointmentId: a.id, seeded: false });
+    if (!st().forms.some((f) => f.clientId === clientId && f.templateId === need && (f.status === 'sent' || (f.status === 'completed' && diffDays(f.date, date) < 365)))) st().forms.push({ id: newId('f_'), clientId, templateId: need, status: 'sent', sentAt: todayStr(), date: null, answers: null, appointmentId: a.id, seeded: false });
   }
-  if (!st().forms.some((f) => f.clientId === clientId && f.templateId === 'intake')) st().forms.push({ id: uid('f_'), clientId, templateId: 'intake', status: 'sent', sentAt: todayStr(), date: null, answers: null, seeded: false });
+  if (!st().forms.some((f) => f.clientId === clientId && f.templateId === 'intake')) st().forms.push({ id: newId('f_'), clientId, templateId: 'intake', status: 'sent', sentAt: todayStr(), date: null, answers: null, seeded: false });
   commit(); return a;
 }
 function moveAppointment(apptId, { date, start, staffId }) {
@@ -181,10 +197,10 @@ function moveAppointment(apptId, { date, start, staffId }) {
 }
 function cancelAppointment(apptId, reason) { const a = apptById(apptId); if (!a) return; a.status = 'cancelled'; a.cancelReason = reason || ''; a.touched = true; a.seeded = false; commit(); }
 function addNote(clientId, { type = 'treatment', text, appointmentId = null, staffId = 's1' }) {
-  const n = { id: uid('n_'), clientId, appointmentId, staffId, date: todayStr(), type, text, at: new Date().toISOString(), seeded: false };
+  const n = { id: newId('n_'), clientId, appointmentId, staffId, date: todayStr(), type, text, at: new Date().toISOString(), seeded: false };
   st().notes.push(n); commit(); return n;
 }
-function deleteNote(id) { const i = st().notes.findIndex((n) => n.id === id); if (i >= 0) { st().notes.splice(i, 1); commit(); } }
+function deleteNote(id) { const i = st().notes.findIndex((n) => n.id === id); if (i >= 0) { if (isLive()) (st().live.tomb ||= []).push({ table: 'notes', id }); st().notes.splice(i, 1); commit(); } }
 async function addPhotoFromFile(clientId, file, kind, area, appointmentId = null) {
   const id = uid('p_');
   const blob = await downscaleImage(file, 1400);
@@ -210,14 +226,16 @@ function downscaleImage(file, max) {
 }
 function upsertClient(data, id) {
   let c = id ? clientById(id) : null;
-  if (!c) { c = { id: uid('c_'), first: '', last: '', phone: '', email: '', dob: '', skin: '', concerns: [], allergies: [], flags: [], source: 'Front desk', createdAt: todayStr(), freq: 2, membershipId: null, memberSince: null, memberStatus: null, vip: false, priorVisits: 0, priorSpend: 0, seeded: false, prefs: '', cardOnFile: null }; st().clients.push(c); }
+  if (!c) { c = { id: newId('c_'), first: '', last: '', phone: '', email: '', dob: '', skin: '', concerns: [], allergies: [], flags: [], source: 'Front desk', createdAt: todayStr(), freq: 2, membershipId: null, memberSince: null, memberStatus: null, vip: false, priorVisits: 0, priorSpend: 0, seeded: false, prefs: '', cardOnFile: null }; st().clients.push(c); }
   Object.assign(c, data); c.seeded = c.seeded && !data.first ? c.seeded : c.seeded; commit(); return c;
 }
 function completeForm(formId, answers, signature) { const f = st().forms.find((x) => x.id === formId); if (!f) return; f.status = 'completed'; f.date = todayStr(); f.answers = answers; f.signature = signature || null; f.seeded = false; commit(); }
-function sendForm(clientId, templateId, appointmentId = null) { const f = { id: uid('f_'), clientId, templateId, status: 'sent', sentAt: todayStr(), date: null, answers: null, appointmentId, seeded: false }; st().forms.push(f); const c = clientById(clientId); st().messages.push({ id: uid('m_'), clientId, channel: 'sms', kind: 'form', body: `Hi ${c.first}, please complete your ${tplById(templateId).name} before your visit: ${bizUrl('/f/' + f.id.slice(-5))}`, at: new Date().toISOString(), status: 'delivered', reply: null, seeded: false }); commit(); return f; }
+// a client deleted here or on another device: off every list and the calendar (a live business keeps the record in the cloud)
+function forgetClient(id) { const s0 = st(); const i = s0.clients.findIndex((c) => c.id === id); if (i >= 0) s0.clients.splice(i, 1); s0.appointments = s0.appointments.filter((a) => a.clientId !== id); invalidateIndex(); if (S.ui.clientId === id) S.ui.clientId = null; }
+function sendForm(clientId, templateId, appointmentId = null) { const f = { id: newId('f_'), clientId, templateId, status: 'sent', sentAt: todayStr(), date: null, answers: null, appointmentId, seeded: false }; st().forms.push(f); const c = clientById(clientId); if (!isLive()) st().messages.push({ id: uid('m_'), clientId, channel: 'sms', kind: 'form', body: `Hi ${c.first}, please complete your ${tplById(templateId).name} before your visit: ${bizUrl('/f/' + f.id.slice(-5))}`, at: new Date().toISOString(), status: 'delivered', reply: null, seeded: false }); commit(); return f; }
 function sendMessage(clientId, body, kind = 'manual') { const m = { id: uid('m_'), clientId, channel: 'sms', kind, body, at: new Date().toISOString(), status: 'delivered', reply: null, seeded: false }; st().messages.push(m); commit(); return m; }
 function closeTicket(ticket) {
-  const t = { ...ticket, id: uid('t_'), closedAt: new Date().toISOString(), seeded: false };
+  const t = { ...ticket, id: newId('t_'), closedAt: new Date().toISOString(), seeded: false };
   st().tickets.push(t);
   if (t.appointmentId) { const a = apptById(t.appointmentId); if (a) { a.status = 'completed'; a.ticketId = t.id; a.touched = true; a.seeded = false; } }
   for (const l of t.lines) if (l.type === 'product') { const p = prodById(l.refId); if (p) p.stock = Math.max(0, p.stock - l.qty); }
@@ -229,7 +247,7 @@ function closeTicket(ticket) {
 function refundTicket(ticketId, { lines, tipRefunded = 0, method, reason, note = '' }) {
   const t = st().tickets.find((x) => x.id === ticketId); if (!t) return null;
   const amount = Math.round((sum(lines, (l) => l.amount) + tipRefunded) * 100) / 100;
-  const r = { id: uid('r_'), ticketId, clientId: t.clientId, staffId: t.staffId, date: todayStr(), lines, amount, tipRefunded, method, reason, note, at: new Date().toISOString(), seeded: false };
+  const r = { id: newId('r_'), ticketId, clientId: t.clientId, staffId: t.staffId, date: todayStr(), lines, amount, tipRefunded, method, reason, note, at: new Date().toISOString(), seeded: false };
   st().refunds.push(r);
   t.refunded = Math.round(((t.refunded || 0) + amount) * 100) / 100; (t.refundIds ||= []).push(r.id); t.seeded = false;
   for (const l of lines) if (l.type === 'product' && !l.partial) { const p = prodById(l.refId); if (p) p.stock += l.qty; }

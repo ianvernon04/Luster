@@ -37,13 +37,7 @@ function renderFormFields(t, answers = {}, readOnly = false) {
     return '';
   }).join('');
 }
-function showIfMet(cond, answers) {
-  const v = answers[cond.field];
-  if (cond.equals !== undefined) return v === cond.equals;
-  if (cond.includes !== undefined) return Array.isArray(v) ? v.includes(cond.includes) : v === cond.includes;
-  if (cond.notIncludes !== undefined) { const arr = Array.isArray(v) ? v : v ? [v] : []; if (cond.nonEmpty && !arr.length) return false; return !arr.includes(cond.notIncludes); }
-  return true;
-}
+// showIfMet() and deriveIntake() live in book/intake.js: the client's phone uses the same rules
 /* reads the live answers off the DOM (choices and checkboxes only — enough for every showIf we use) */
 function liveAnswers(root) {
   const a = {};
@@ -60,7 +54,7 @@ Modals['form-fill'] = ({ id, preview, tplId }) => {
   return { title: `${esc(t.name)}${c ? ` · ${esc(fullName(c))}` : ' · preview'}`, wide: t.kind === 'intake', body: `${t.text ? `<div class="consent-text">${esc(t.text)}</div>` : ''}${sections.length ? `<div class="row wrap small muted" style="gap:6px">${sections.map((x) => `<span class="step">${esc(x.label)}</span>`).join('')}<span class="tiny faint">· about ${t.estMinutes || 3} min · questions appear only when they apply</span></div>` : ''}<form id="ff" class="col" style="gap:14px" onsubmit="return false">${renderFormFields(t, f ? prefillIntake(t, c) : {})}</form>`, foot: `<button class="btn" data-act="close-modal">${preview ? 'Close' : 'Later'}</button>${preview ? '' : `<button class="btn primary" data-act="form-submit" data-id="${id}">Sign &amp; save</button>`}`, mount(root) { bindSignaturePad(root); applyShowIf(root); } };
 };
 function prefillIntake(t, c) { if (t.id !== 'intake' || !c) return {}; return { skin: c.skin, concerns: c.concerns, allergies: c.allergies.length ? c.allergies.map((x) => x.split(' (')[0]) : [], referral: c.source === 'Referral' ? 'Friend or family' : c.source }; }
-Modals['form-view'] = ({ id }) => { const f = st().forms.find((x) => x.id === id); const t = tplById(f.templateId); const c = clientById(f.clientId); return { title: `${esc(t.name)} · ${esc(fullName(c))}`, wide: t.kind === 'intake', body: `<div class="small muted">Signed ${fmtDate(f.date, 'long')}${f.appointmentId && apptById(f.appointmentId) ? ` · for ${esc(apptTitle(apptById(f.appointmentId)))}` : ''}</div><div class="col" style="gap:12px">${renderFormFields(t, { ...(f.answers || {}), __sig: f.signature, __name: fullName(c) }, true)}</div>`, foot: `<button class="btn" data-act="close-modal">Close</button>` }; };
+Modals['form-view'] = ({ id }) => { const f = st().forms.find((x) => x.id === id); const t = tplById(f.templateId); const c = clientById(f.clientId); if (Cloud.openFormAnswers(f)) return { title: `${esc(t.name)} · ${esc(fullName(c))}`, body: `<div class="small muted">Opening the signed form from the cloud. Every opening is logged.</div>`, foot: '<button class="btn" data-act="close-modal">Close</button>' }; return { title: `${esc(t.name)} · ${esc(fullName(c))}`, wide: t.kind === 'intake', body: `<div class="small muted">Signed ${fmtDate(f.date, 'long')}${f.appointmentId && apptById(f.appointmentId) ? ` · for ${esc(apptTitle(apptById(f.appointmentId)))}` : ''}</div><div class="col" style="gap:12px">${renderFormFields(t, { ...(f.answers || {}), __sig: f.signature, __name: fullName(c) }, true)}</div>`, foot: `<button class="btn" data-act="close-modal">Close</button>` }; };
 function bindSignaturePad(root) {
   const cv = $('#sig-pad', root); if (!cv) return; const ctx = cv.getContext('2d'); let drawing = false; cv.dataset.signed = '0';
   const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
@@ -87,31 +81,12 @@ function collectForm(root, t) {
 }
 /* Turn a completed intake into the client record: skin, allergies, cautions and the health summary the team sees everywhere. */
 function applyIntakeToClient(c, a) {
-  const patch = {}; const flags = new Set(c.flags.filter((k) => !FLAGS.some((f) => f.k === k)));
-  const cond = a.conditions || [], meds = a.meds || [], procs = a.procedures || [];
-  if (cond.includes('Cancer (current or past)')) flags.add('oncology');
-  if (cond.includes('Diabetes')) flags.add('diabetes');
-  if (cond.includes('Cold sores (herpes simplex)')) flags.add('hsv');
-  if (cond.some((x) => x.startsWith('Autoimmune'))) flags.add('autoimmune');
-  if (cond.includes('Pacemaker or metal implants') || cond.includes('Epilepsy or seizures')) flags.add('pacemaker');
-  if (cond.includes('Bleeding or clotting disorder') || meds.some((x) => x.startsWith('Blood thinners'))) flags.add('thinners');
-  if (cond.includes('Keloid or raised scarring')) flags.add('keloid');
-  if (a.pregnant === 'Pregnant' || a.pregnant === 'Nursing') flags.add('pregnant');
-  if (meds.some((x) => x.startsWith('Accutane'))) flags.add('accutane');
-  if (meds.some((x) => x.startsWith('Retinoids')) || (a.routine || []).includes('Retinol or tretinoin')) flags.add('retinoid');
-  if (procs.includes('Botox or fillers')) flags.add('botox');
-  for (const f of tpl().intake.section.fields) { if (!f.flag) continue; const v = a[f.id]; const hit = Array.isArray(v) ? v.includes(f.flag.when) : v === f.flag.when; if (hit) flags.add(f.flag.k); }
-  if ((a.allergies || []).includes('Hair dye (PPD)')) flags.add('ppd'); if ((a.allergies || []).includes('Acrylates (gel or acrylic nails)')) flags.add('acrylate'); if ((a.allergies || []).includes('Adhesives (lash glue, tape)')) flags.add('adhesive');
-  if (cond.includes('Blood clots or DVT')) flags.add('dvt'); if (cond.some((x) => x.startsWith('Neuromuscular'))) flags.add('neuro'); if (cond.some((x) => x.startsWith('Recent surgery'))) flags.add('surgery');
-  const allergies = (a.allergies || []).filter((x) => x !== 'None known' && x !== 'Seasonal allergies').concat(a.allergies_other ? [a.allergies_other] : []);
-  if (allergies.length) flags.add('allergy');
-  patch.flags = Array.from(flags); patch.allergies = allergies;
-  if (a.skin) patch.skin = a.skin; if (a.concerns?.length) patch.concerns = a.concerns;
-  const cancer = cond.includes('Cancer (current or past)') ? { type: a.cancer_type || '', status: a.cancer_status || '', tx: a.cancer_tx || [], radiationArea: a.cancer_radiation_area || '', lymph: a.cancer_lymph || '', port: a.cancer_port || '', effects: a.cancer_effects || [], clearance: a.cancer_clearance || 'Not yet', physician: a.cancer_physician || '' } : null;
-  const vertical = {}; for (const f of tpl().intake.section.fields) if (f.id !== 'skin' && f.id !== 'concerns' && a[f.id] !== undefined) vertical[f.id] = a[f.id];
-  patch.medical = { ...(c.medical || {}), vertical, conditions: cond, conditionsDetail: a.conditions_detail || '', cancer, meds, medsList: a.meds_list || '', allergies: a.allergies || [], allergiesOther: a.allergies_other || '', pregnancy: a.pregnant || '', procedures: procs, proceduresDate: a.procedures_date || '', trimester: a.trimester || '', sun: a.sun || '', smoke: a.smoke || '', routine: a.routine || [], products: a.products || '', goals: a.goals || '', emergency: { name: a.emergency_name || '', phone: a.emergency_phone || '' }, occupation: a.occupation || '', pressure: a.pressure || '', scent: a.scent || '', chat: a.chat || '', photos: a.photos || '', under18: a.under18 || '', guardian: a.guardian || '', updatedAt: todayStr() };
-  const prefBits = [a.pressure ? `${a.pressure} pressure` : '', a.chat === 'Quiet, please' ? 'quiet room' : '', a.scent === 'Yes' ? 'no scents' : ''].filter(Boolean);
-  if (!c.prefs && prefBits.length) patch.prefs = prefBits.join(', ');
+  // health flags are re-derived from the new answers; anything else (VIP, custom) stays
+  const d = deriveIntake(a, tpl().intake.section.fields, todayStr());
+  const flags = new Set([...c.flags.filter((k) => !FLAGS.some((f) => f.k === k)), ...d.flags]);
+  const patch = { flags: Array.from(flags), allergies: d.allergies, medical: { ...(c.medical || {}), ...d.medical } };
+  if (d.skin) patch.skin = d.skin; if (d.concerns.length) patch.concerns = d.concerns;
+  if (!c.prefs && d.prefs) patch.prefs = d.prefs;
   return upsertClient(patch, c.id);
 }
 Object.assign(Actions, {
@@ -119,8 +94,8 @@ Object.assign(Actions, {
   'fill-form': (el) => { closeDrawer(); openModal('form-fill', { id: el.dataset.id }); },
   'form-preview': (el) => openModal('form-fill', { preview: true, tplId: el.dataset.tpl }),
   'view-form': (el) => openModal('form-view', { id: el.dataset.id }),
-  'resend-form': (el) => { const f = st().forms.find((x) => x.id === el.dataset.id); f.sentAt = todayStr(); const c = clientById(f.clientId); sendMessage(c.id, `Hi ${c.first}, quick one before your visit — your ${tplById(f.templateId).name} takes a few minutes: simplyfacials.example/f/${f.id.slice(-5)}`, 'form'); commit(); toast(`Resent to ${fmtPhone(c.phone)} (simulated)`); },
-  'send-form': (el) => { sendForm(el.dataset.client, el.dataset.tpl); const d = $('#client-detail'); if (d) d.innerHTML = clientDetail(S.ui.clientId); toast('Form sent by text (simulated)'); },
+  'resend-form': (el) => { const f = st().forms.find((x) => x.id === el.dataset.id); if (isLive()) return sendFormLink(f); f.sentAt = todayStr(); const c = clientById(f.clientId); sendMessage(c.id, `Hi ${c.first}, quick one before your visit — your ${tplById(f.templateId).name} takes a few minutes: ${bizUrl('/f/' + f.id.slice(-5))}`, 'form'); commit(); toast(`Resent to ${fmtPhone(c.phone)} (simulated)`); },
+  'send-form': (el) => { const f = sendForm(el.dataset.client, el.dataset.tpl); const d = $('#client-detail'); if (d) d.innerHTML = clientDetail(S.ui.clientId); if (isLive()) return sendFormLink(f); toast('Form sent by text (simulated)'); },
   'ff-opt': (el) => { const box = el.closest('[data-field]'); if (box.dataset.type === 'multi') { const none = /^None/.test(el.dataset.v); if (none) $$('.opt', box).forEach((b) => b.classList.toggle('on', b === el && !el.classList.contains('on'))); else { el.classList.toggle('on'); $$('.opt', box).forEach((b) => { if (/^None/.test(b.dataset.v)) b.classList.remove('on'); }); } } else { $$('.opt', box).forEach((b) => b.classList.toggle('on', b === el)); } const root = el.closest('form'); if (root) applyShowIf(root); },
   'sig-clear': () => { const cv = $('#sig-pad'); if (cv && cv._clear) cv._clear(); },
   'form-submit': (el) => {

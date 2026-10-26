@@ -165,7 +165,9 @@ function contraHtml(c, serviceIds) {
 /* ---- drawers: appointment detail / edit / new ---- */
 Drawers.appt = ({ id }) => {
   const a = apptById(id); if (!a) return null;
-  const c = clientById(a.clientId); const s = staffById(a.staffId); const stats = clientStats(c.id);
+  const c = clientById(a.clientId); const s = staffById(a.staffId) || { name: 'Unassigned', color: '#566068' };
+  if (!c) return { title: `${fmtTime(a.start)} · ${esc(apptTitle(a))}`, body: `<p class="small muted">${fmtDate(a.date, 'dow')} · ${fmtRange(a.start, a.dur)} · ${esc(s.name)}. No client on this booking.</p>`, foot: a.status === 'cancelled' ? '' : `<button class="btn danger" data-act="cancel-appt-ask" data-id="${a.id}">Cancel</button>` };
+  const stats = clientStats(c.id);
   const pendingForms = st().forms.filter((f) => f.clientId === c.id && f.status === 'sent');
   const price = sum(a.items, (i) => i.price);
   const canCheckIn = ['booked', 'confirmed'].includes(a.status);
@@ -180,7 +182,8 @@ Drawers.appt = ({ id }) => {
       <div class="row" style="gap:12px;cursor:pointer" data-act="open-client" data-id="${c.id}">${avatar(c, 'lg')}<div class="grow"><div class="strong" style="font-size:16px">${esc(fullName(c))}</div><div class="small muted">${fmtPhone(c.phone)} · ${stats.visits} visits · ${stats.last ? 'last ' + relDate(stats.last).toLowerCase() : 'first visit'}</div><div class="flags">${flagBadges(c)}</div></div>${I.right}</div>
       ${contraHtml(c, a.items.map((i) => i.serviceId))}
       ${clientAlerts(c)}
-      ${pendingForms.length ? `<div class="alert warn">${I.forms}<div><b>${pendingForms.length} form${pendingForms.length > 1 ? 's' : ''} not signed:</b> ${pendingForms.map((f) => esc(tplById(f.templateId).name)).join(', ')}. <button class="btn sm" style="margin-top:6px" data-act="fill-form" data-id="${pendingForms[0].id}">Fill out now</button></div></div>` : ''}
+      ${isLive() && canCheckIn && a.date >= todayStr() ? apptOutreachHtml(a) : ''}
+      ${pendingForms.length ? `<div class="alert warn">${I.forms}<div><b>${pendingForms.length} form${pendingForms.length > 1 ? 's' : ''} not signed:</b> ${pendingForms.map((f) => esc((tplById(f.templateId) || { name: f.templateId }).name)).join(', ')}. <div class="row wrap" style="gap:6px;margin-top:6px"><button class="btn sm" data-act="fill-form" data-id="${pendingForms[0].id}">Fill out now</button>${isLive() ? `<button class="btn sm" data-act="resend-form" data-id="${pendingForms[0].id}">Send link to ${esc(c.first)}</button>` : ''}</div></div></div>` : ''}
       <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Services</div>${a.items.map((i) => { const sv = svcById(i.serviceId); return `<div class="row between" style="padding:4px 0"><span>${catDot(sv.cat, 'display:inline-block;vertical-align:middle;margin-right:8px')}${esc(sv.name)}</span><span class="small muted num">${fmtDur(i.dur)} · ${money(i.price, { whole: true })}</span></div>`; }).join('')}<div class="divider" style="margin:8px 0"></div><div class="row between strong"><span>${fmtRange(a.start, a.dur)}</span><span class="num">${money(price, { whole: true })}</span></div></div>
       <dl class="kv"><dt>With</dt><dd><span class="row" style="gap:6px"><span class="avatar sm" style="background:${s.color};width:20px;height:20px;font-size:9px">${initials(s.name)}</span>${esc(s.name)}</span></dd><dt>Booked</dt><dd>${relDate(a.createdAt)} · ${a.source === 'online' ? 'online' : 'front desk'}</dd>${a.arrivedAt ? `<dt>Arrived</dt><dd>${new Date(a.arrivedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</dd>` : ''}${c.prefs ? `<dt>Prefers</dt><dd>${esc(c.prefs)}</dd>` : ''}</dl>
       <div class="field"><label for="appt-note-${a.id}">Appointment note</label><textarea class="textarea" id="appt-note-${a.id}" data-on-change="appt-note" data-id="${a.id}" placeholder="Running late, special requests, who referred them…" style="min-height:64px">${esc(a.notes || '')}</textarea></div>
@@ -188,6 +191,12 @@ Drawers.appt = ({ id }) => {
     foot,
   };
 };
+// Live businesses: confirmations and reminders go out from the studio phone; show what's been sent for this visit.
+function apptOutreachHtml(a) {
+  const sent = st().messages.filter((m) => m.appointmentId === a.id && (m.kind === 'confirmation' || m.kind === 'reminder')).sort(by((m) => m.at));
+  const last = sent[sent.length - 1];
+  return `<div class="row wrap" style="gap:6px;align-items:center"><button class="btn sm" data-act="appt-confirm-send" data-id="${a.id}">${I.messages}Send confirmation</button><button class="btn sm" data-act="appt-remind-send" data-id="${a.id}">${I.clock}Send reminder</button><span class="tiny faint">${last ? `${esc(KIND_LABEL[last.kind])} ${last.status === 'handed_off' ? 'sent from the studio' : 'sent'} ${timeAgo(last.at)}` : a.source === 'online' ? 'Confirmed on the booking page' : 'Nothing sent yet'}</span></div>`;
+}
 function lastNotesFor(cid, n) {
   const notes = st().notes.filter((x) => x.clientId === cid).sort(by((x) => x.date)).reverse().slice(0, n);
   if (!notes.length) return '';
@@ -207,7 +216,7 @@ Drawers['appt-form'] = () => {
   const slots = dur ? freeSlots(d.staffId, d.date, dur, 15, { allowPast: true }) : [];
   const staffHrs = staffWorking(d.staffId, d.date);
   if (d.start !== null && dur && !slots.includes(d.start) && !(d.editId && apptById(d.editId)?.start === d.start && apptById(d.editId)?.date === d.date && apptById(d.editId)?.staffId === d.staffId)) { /* keep but flag */ }
-  const grouped = groupBy(st().services, (s) => s.cat);
+  const grouped = groupBy(st().services.filter((s) => !s.internal), (s) => s.cat);
   const clientBlock = c ? `<div class="row" style="gap:10px">${avatar(c)}<div class="grow"><div class="strong">${esc(fullName(c))}</div><div class="small muted">${fmtPhone(c.phone)}${c.membershipId ? ' · ' + esc(planById(c.membershipId).name) : ''}</div><div class="flags">${flagBadges(c)}</div></div>${d.editId ? '' : `<button class="btn sm ghost" data-act="draft-clear-client">Change</button>`}</div>${contraHtml(c, d.serviceIds)}`
     : d.newClient ? `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">New client</div><div class="field-row"><input class="input" id="nc-first" placeholder="First name" value="${esc(d.newClient.first || '')}" data-on-input="draft-nc" data-k="first"><input class="input" id="nc-last" placeholder="Last name" value="${esc(d.newClient.last || '')}" data-on-input="draft-nc" data-k="last"></div><div class="field-row" style="margin-top:8px"><input class="input" id="nc-phone" placeholder="Mobile" inputmode="tel" value="${esc(d.newClient.phone || '')}" data-on-input="draft-nc" data-k="phone"><input class="input" id="nc-email" placeholder="Email (optional)" inputmode="email" value="${esc(d.newClient.email || '')}" data-on-input="draft-nc" data-k="email"></div><button class="btn sm ghost" style="margin-top:8px" data-act="draft-cancel-nc">Search existing instead</button></div>`
     : `<div class="field"><label for="draft-q">Client</label><div class="search">${I.search}<input id="draft-q" placeholder="Name or phone…" value="${esc(d.clientQuery)}" data-on-input="draft-q" autocomplete="off"></div><div id="draft-results" class="list">${draftResults(d.clientQuery)}</div></div>`;
@@ -253,7 +262,7 @@ Object.assign(Actions, {
   rebook: (el) => { const a = apptById(el.dataset.id); const date = addDays(todayStr() > a.date ? todayStr() : a.date, 28); S.ui.draft = newDraft({ clientId: a.clientId, staffId: a.staffId, date, serviceIds: a.items.map((i) => i.serviceId) }); const slots = freeSlots(a.staffId, date, draftDur(S.ui.draft)); const near = slots.find((t) => t >= a.start) ?? slots[0] ?? null; S.ui.draft.start = near; openDrawer('appt-form'); },
   'set-status': (el) => { setStatus(el.dataset.id, el.dataset.status); const a = apptById(el.dataset.id); renderDrawer(); rerenderContent(); toast(`${fullName(clientById(a.clientId))} · ${STATUS_LABEL[a.status]}`); },
   'cancel-appt-ask': (el) => openModal('cancel', { id: el.dataset.id }),
-  'cancel-appt': (el) => { const a = apptById(el.dataset.id); const reason = $('#cancel-reason')?.value; const notify = $('#cancel-notify')?.checked; cancelAppointment(a.id, reason); if (notify) sendMessage(a.clientId, `Hi ${clientById(a.clientId).first}, your ${apptTitle(a)} on ${fmtDate(a.date, 'dow')} at ${fmtTime(a.start)} has been cancelled. Rebook any time: ${bizUrl('/book')}`, 'cancellation'); closeModal(); closeDrawer(); rerenderContent(); toast('Appointment cancelled', 'good'); },
+  'cancel-appt': (el) => { const a = apptById(el.dataset.id); const reason = $('#cancel-reason')?.value; const notify = $('#cancel-notify')?.checked; cancelAppointment(a.id, reason); if (notify && clientById(a.clientId)) sendMessage(a.clientId, `Hi ${clientById(a.clientId).first}, your ${apptTitle(a)} on ${fmtDate(a.date, 'dow')} at ${fmtTime(a.start)} has been cancelled. Rebook any time: ${bizUrl('/book')}`, 'cancellation'); closeModal(); closeDrawer(); rerenderContent(); toast('Appointment cancelled', 'good'); },
   'undo-move': (el) => { const res = moveAppointment(el.dataset.id, { start: +el.dataset.start, staffId: el.dataset.staff, date: el.dataset.date }); if (res.ok) { rerenderContent(); toast('Moved back'); } else toast(res.reason, 'bad'); },
   'open-waitlist': () => openDrawer('waitlist'),
   'waitlist-remove': (el) => { removeFromWaitlist(el.dataset.id); renderDrawer(); rerenderContent(); },
@@ -278,7 +287,7 @@ Object.assign(Actions, {
     const a = createAppointment({ clientId: cid, staffId: d.staffId, date: d.date, start: d.start, items, notes: d.notes });
     if (d.waitlistId) removeFromWaitlist(d.waitlistId);
     closeDrawer(); if (S.ui.view === 'calendar') { S.ui.date = d.date; } rerenderContent();
-    toast(`Booked ${fullName(clientById(cid))} · ${fmtDate(d.date, 'dow')} ${fmtTime(d.start)}`, 'good', { label: 'Open', act: 'open-appt', attrs: `data-id="${a.id}"` });
+    toast(`Booked ${esc(fullName(clientById(cid)))} · ${fmtDate(d.date, 'dow')} ${fmtTime(d.start)}`, 'good', isLive() ? { label: 'Send confirmation', act: 'appt-confirm-send', attrs: `data-id="${a.id}"` } : { label: 'Open', act: 'open-appt', attrs: `data-id="${a.id}"` });
   },
 });
 /* input / change delegation */

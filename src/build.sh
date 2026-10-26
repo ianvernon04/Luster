@@ -9,7 +9,7 @@ OUT=index.html
   cat parts/20-markup.html
   echo "<script>"
   echo "'use strict';"
-  for f in parts/3*.js parts/4*.js parts/50-app.js; do
+  for f in ../book/intake.js parts/3*.js parts/4*.js parts/50-app.js; do   # intake.js: rules shared with the client's phone
     echo "/* ---- $f ---- */"
     cat "$f"
     echo

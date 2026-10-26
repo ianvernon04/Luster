@@ -25,6 +25,11 @@ const eq = (a, b, what) => { if (a !== b) throw new Error(`${what}: got ${JSON.s
   await p.waitForTimeout(1200);
   await t('app shell is cached', async () => { const c = await p.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys[0]); return (await c.keys()).length; }); if (c < 8) throw new Error('cached entries: ' + c); });
   await t('offline reload still renders', async () => { await ctx.setOffline(true); await p.reload({ waitUntil: 'load' }).catch(() => {}); await p.waitForSelector('.cal-grid', { timeout: 15000 }); await ctx.setOffline(false); });
+  await t('visiting the privacy page never replaces the cached app', async () => {
+    await p.goto(base + 'privacy.html', { waitUntil: 'load' }); if (!/Privacy/.test(await p.textContent('h1'))) throw new Error('privacy page');
+    await ctx.setOffline(true); await p.goto(base, { waitUntil: 'load' }).catch(() => {});   // the next launch is offline
+    await p.waitForSelector('.cal-grid', { timeout: 15000 }); await ctx.setOffline(false);
+  });
   await t('no install hint on desktop without a browser prompt', async () => { await p.waitForTimeout(1800); eq(await p.$('.install-hint'), null, 'hint'); });
   await ctx.close();
   // a setup link: manifest becomes a data: URL whose start_url is this exact URL

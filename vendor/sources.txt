@@ -1,0 +1,3 @@
+# file                       npm package@version           file inside the package
+vendor/supabase-2.45.4.js    @supabase/supabase-js@2.45.4  package/dist/umd/supabase.js
+vendor/qrcode-1.4.4.js       qrcode-generator@1.4.4        package/qrcode.js

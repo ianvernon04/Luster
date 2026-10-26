@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book online</title>
+<meta name="description" content="Book your appointment online.">
+<meta name="theme-color" content="#1E5C68">
+<link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap">
+<style>
+:root {
+  --bg: #F3F2ED; --surface: #FFFFFF; --surface-2: #F8F7F3; --surface-3: #EFEDE7;
+  --ink: #1B2224; --ink-2: #566068; --ink-3: #8A9399; --line: #E2DFD7; --line-2: #ECEAE3;
+  --accent: #1E5C68; --accent-strong: #164A54; --accent-ink: #FFFFFF; --accent-soft: #E1EDEF;
+  --good: #2D7A4F; --good-soft: #E0F0E6; --good-ink: #1F5C3A; --bad: #B23A30; --bad-soft: #F9E3E0; --bad-ink: #8C2A22;
+  --warn-soft: #FAF0D9; --warn-ink: #7A5010;
+  --shadow: 0 1px 2px rgba(27,34,36,.06), 0 8px 24px rgba(27,34,36,.08);
+  --serif: "Instrument Serif", Georgia, serif; --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111516; --surface: #191F21; --surface-2: #1F2629; --surface-3: #263033;
+    --ink: #ECEAE4; --ink-2: #AEB6BA; --ink-3: #7E888D; --line: #2B3539; --line-2: #232C2F;
+    --accent: #6DBAC5; --accent-strong: #8CCBD4; --accent-ink: #0E2A2F; --accent-soft: #1C3338;
+    --good: #67BE8B; --good-soft: #1C3326; --good-ink: #9ADBB5; --bad: #E27C72; --bad-soft: #3D1F1C; --bad-ink: #F2A49C;
+    --warn-soft: #3A2E15; --warn-ink: #F0C97E; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); -webkit-font-smoothing: antialiased; min-height: 100vh;
+  padding: env(safe-area-inset-top, 0) max(16px, env(safe-area-inset-right, 0)) calc(96px + env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0)); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 560px; margin: 0 auto; }
+.hero { text-align: center; padding: 28px 0 18px; }
+.hero h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 8vw, 40px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; }
+.hero .meta { color: var(--ink-2); font-size: 13.5px; margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
+.hero .meta a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+.tz { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12.5px; color: var(--warn-ink); background: var(--warn-soft); padding: 4px 10px; border-radius: 999px; }
+.card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; }
+.progress { margin: 0 0 16px; }
+.progress .lbl { font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; margin-bottom: 6px; }
+.progress .lbl b { color: var(--accent-strong); font-weight: 600; }
+.progress .track { height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.progress .fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .2s ease; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+.sub { color: var(--ink-2); font-size: 13.5px; margin: 0 0 14px; }
+.group h3 { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px; font-weight: 600; }
+.group:first-child h3 { margin-top: 0; }
+.opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 13px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); margin-bottom: 8px; min-height: 56px; }
+.opt:hover { background: var(--surface-2); }
+.opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
+.opt .t { font-weight: 600; }
+.opt .d { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.opt .p { margin-left: auto; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.opt .p small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; }
+.tick { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; }
+.opt[aria-pressed="true"] .tick { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 14px; flex: none; background: var(--accent); }
+.days { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 -2px; scroll-snap-type: x proximity; }
+.day { flex: none; width: 62px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); text-align: center; scroll-snap-align: start; }
+.day .dw { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.day .dn { font-family: var(--serif); font-size: 24px; line-height: 1.1; }
+.day .dm { font-size: 11px; color: var(--ink-3); }
+.day[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.day:disabled { opacity: .38; cursor: default; }
+.more { flex: none; width: 62px; border: 1px dashed var(--line); border-radius: 12px; background: transparent; color: var(--ink-2); font-size: 12px; }
+.period { font-size: 12px; color: var(--ink-3); margin: 14px 0 8px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.slot { padding: 11px 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-variant-numeric: tabular-nums; min-height: 44px; }
+.slot:hover { background: var(--surface-2); }
+.slot[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.field label { font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.field .hint { font-size: 12px; color: var(--ink-3); }
+.input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); min-height: 46px; font-size: 16px; }
+.input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+textarea.input { min-height: 80px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); margin: 4px 0 12px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 1px 0 0; flex: none; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.summary { display: flex; flex-direction: column; gap: 10px; }
+.summary .ln { display: flex; justify-content: space-between; gap: 14px; font-size: 14.5px; }
+.summary .ln span:first-child { color: var(--ink-2); }
+.summary .ln span:last-child { text-align: right; font-weight: 500; }
+.summary .total { border-top: 1px solid var(--line-2); padding-top: 10px; font-weight: 600; }
+.policy { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-top: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; text-decoration: none; color: var(--ink); }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { background: var(--accent-strong); }
+.btn.danger { color: var(--bad); }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.link { border: 0; background: transparent; color: var(--ink-2); min-height: 40px; padding: 8px 10px; font-weight: 500; }
+.actions { display: flex; gap: 10px; margin-top: 16px; }
+.actions .btn { flex: 1; }
+.actions .btn.back { flex: 0 0 auto; padding-inline: 14px; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0)); }
+.bar .in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.bar .sum { flex: 1; min-width: 0; font-size: 13.5px; color: var(--ink-2); }
+.bar .sum b { color: var(--ink); display: block; font-size: 14.5px; }
+.alert { padding: 11px 13px; border-radius: 10px; font-size: 14px; margin-bottom: 14px; }
+.alert.bad { background: var(--bad-soft); color: var(--bad-ink); }
+.alert.good { background: var(--good-soft); color: var(--good-ink); }
+.alert.info { background: var(--accent-soft); color: var(--accent-strong); }
+.done { text-align: center; padding: 22px 18px 18px; }
+.done .ok { width: 64px; height: 64px; border-radius: 50%; background: var(--good-soft); color: var(--good-ink); display: grid; place-items: center; margin: 0 auto 10px; }
+.done h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; margin: 0 0 4px; }
+.muted { color: var(--ink-2); }
+.empty { text-align: center; color: var(--ink-2); padding: 18px 8px; }
+.foot { text-align: center; color: var(--ink-3); font-size: 12px; margin-top: 22px; }
+.foot a { color: inherit; }
+.skeleton { height: 56px; border-radius: 12px; background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: sh 1.2s linear infinite; margin-bottom: 8px; }
+@keyframes sh { to { background-position: -200% 0; } }
+@media (max-width: 380px) { .row2 { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+svg.i { width: 18px; height: 18px; flex: none; }
+/* forms filled in on the client's phone (?f=…) */
+.fsec { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 26px 0 4px; font-weight: 600; }
+.fsec + .sub { margin-bottom: 10px; }
+.ffield { margin-bottom: 18px; scroll-margin-top: 80px; }
+.ffield > .q { font-size: 14.5px; font-weight: 500; margin-bottom: 8px; display: block; }
+.ffield .hint { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.ffield.missing > .q, .ffield.missing .check span { color: var(--bad); }
+.ffield.missing .chips, .ffield.missing .sig, .ffield.missing .input { box-shadow: 0 0 0 2px var(--bad-soft); border-radius: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 9px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; min-height: 40px; text-align: left; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.sig { display: block; width: 100%; height: 160px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-2); touch-action: none; }
+.consent { white-space: pre-wrap; font-size: 13.5px; color: var(--ink-2); background: var(--surface-2); border-radius: 10px; padding: 12px; margin: 0 0 16px; max-height: 260px; overflow: auto; }
+.next { margin-top: 16px; text-align: left; border: 1px solid var(--accent-soft); background: var(--accent-soft); border-radius: 12px; padding: 14px; }
+.next b { display: block; color: var(--accent-strong); margin-bottom: 2px; }
+.next p { margin: 0 0 10px; font-size: 13.5px; color: var(--ink-2); }
+</style>
+<script src="../config.js"></script>
+<script src="intake.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero" id="hero"></header>
+  <main id="app" aria-live="polite"><div class="card"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></main>
+  <p class="foot">Online booking by <a href="https://www.nwluster.com/" rel="noopener">Luster</a> · <a href="../privacy.html">Privacy</a></p>
+</div>
+<div id="bar"></div>
+<script>
+(() => {
+'use strict';
+const CFG = window.LUSTER_CONFIG || {};
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ICON = {
+  check: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  big: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  left: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  cal: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>',
+  spark: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>',
+};
+
+// ---------------------------------------------------------------- formatting (all times are the studio's own time)
+const money = (c) => '$' + (c % 100 ? (c / 100).toFixed(2) : String(c / 100));
+const dur = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ''}`);
+const clock = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const ymdDate = (ymd) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d, 12)); };
+const fmtYmd = (ymd, o) => new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', ...o }).format(ymdDate(ymd));
+const fmtAt = (iso, tz, o) => new Intl.DateTimeFormat('en-US', { timeZone: tz, ...o }).format(new Date(iso));
+const zoneName = (tz) => { try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longGeneric' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName').value; } catch (e) { return tz; } };
+const zoneShort = (tz) => { try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName').value; } catch (e) { return ''; } };
+const deviceZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return ''; } };
+const addDay = (ymd, n) => { const d = ymdDate(ymd); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+// ---------------------------------------------------------------- API (Supabase RPC, public key only)
+const configured = () => CFG.supabaseUrl && CFG.supabaseAnonKey && !/YOUR-PROJECT/.test(CFG.supabaseUrl);
+async function rpc(fn, args) {
+  const res = await fetch(`${CFG.supabaseUrl}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: CFG.supabaseAnonKey, Authorization: `Bearer ${CFG.supabaseAnonKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) { let m = `HTTP ${res.status}`; try { m = (await res.json()).message || m; } catch (e) {} throw new Error(m); }
+  return res.json();
+}
+const REASONS = {
+  taken: 'Someone just booked that time. Here are the latest openings.',
+  too_soon: 'That time is too close to book online now. Pick a later time, or call us.',
+  too_far: "That's further out than we take online bookings.",
+  rate_limited: 'Too many attempts from this device. Please wait a few minutes, or call us.',
+  too_many: 'This number already has three upcoming online bookings. Please call us to book more.',
+  missing_contact: 'We need your first name and a mobile number.',
+  bad_email: "That email address doesn't look right.",
+  bad_service: "One of those services isn't available online anymore.",
+  not_found: "Online booking isn't available for this studio right now.",
+  too_late: "It's too close to your appointment to change it online. Please call us.",
+  not_changeable: 'This appointment can no longer be changed online.',
+  rejected: 'Something went wrong. Please try again.',
+  signature: 'Please sign with your finger in the box.',
+  invalid: "Some answers didn't come through. Please check the form and try again.",
+};
+
+// ---------------------------------------------------------------- state
+const qs = new URLSearchParams(location.search);
+const S = {
+  mode: qs.get('f') ? 'form' : qs.get('t') ? 'manage' : 'book', slug: (qs.get('s') || '').trim().toLowerCase(), token: (qs.get('t') || '').trim(), ftoken: (qs.get('f') || '').trim(),
+  form: null, first: '',
+  p: null, step: 0, serviceIds: [], staffId: 'any', from: null, to: null, days: [], date: null, slot: null,
+  d: { first: '', last: '', phone: '', email: '', note: '', sms: true, website: '' },
+  busy: false, err: '', note: '', result: null, appt: null, biz: null, confirmCancel: false,
+};
+const STEPS = ['Service', 'Provider', 'Time', 'Details', 'Confirm'];
+const tz = () => (S.p && S.p.timezone) || (S.biz && S.biz.timezone) || 'America/Chicago';
+const svc = (id) => S.p.services.find((s) => s.id === id);
+const staff = (id) => S.p.staff.find((s) => s.id === id);
+const total = () => S.serviceIds.reduce((a, id) => { const s = svc(id); return { min: a.min + s.duration_min, cents: a.cents + s.price_cents }; }, { min: 0, cents: 0 });
+const eligible = () => S.p.staff.filter((st) => S.serviceIds.every((id) => st.services.includes(id)));
+
+// ---------------------------------------------------------------- rendering
+function hero(name, sub = []) {
+  const away = deviceZone() && deviceZone() !== tz();
+  $('#hero').innerHTML = `<h1>${esc(name)}</h1>${sub.length ? `<div class="meta">${sub.join('')}</div>` : ''}${away ? `<div class="tz">${ICON.cal}Times shown in ${esc(zoneName(tz()))}</div>` : ''}`;
+  document.title = `Book · ${name}`;
+}
+function contactBits(b) {
+  const out = [];
+  if (b.address) out.push(`<a href="https://maps.apple.com/?q=${encodeURIComponent(b.address)}" rel="noopener">${esc(b.address)}</a>`);
+  if (b.phone) out.push(`<a href="tel:${esc(b.phone.replace(/[^\d+]/g, ''))}">${esc(b.phone)}</a>`);
+  return out;
+}
+const stepsBar = () => `<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="${STEPS.length}" aria-valuenow="${S.step + 1}" aria-label="Step ${S.step + 1} of ${STEPS.length}: ${STEPS[S.step]}"><div class="lbl"><b>${STEPS[S.step]}</b><span>Step ${S.step + 1} of ${STEPS.length}</span></div><div class="track"><div class="fill" style="width:${((S.step + 1) / STEPS.length) * 100}%"></div></div></div>`;
+const alertHtml = () => (S.err ? `<div class="alert bad" role="alert">${esc(S.err)}</div>` : S.note ? `<div class="alert info">${esc(S.note)}</div>` : '');
+function bar(html) { $('#bar').innerHTML = html ? `<div class="bar"><div class="in">${html}</div></div>` : ''; }
+function screen(html) { $('#app').innerHTML = html; }
+function message(title, body, extra = '') { screen(`<div class="card"><div class="empty"><h2>${esc(title)}</h2><p class="muted">${body}</p>${extra}</div></div>`); bar(''); }
+
+function render() {
+  if (S.mode === 'manage') return renderManage();
+  const p = S.p;
+  if (S.step === 0) {
+    const cats = (p.categories && p.categories.length ? p.categories : [...new Set(p.services.map((s) => s.category))].map((k) => ({ key: k, label: k })));
+    const known = new Set(cats.map((c) => c.key));
+    const extra = [...new Set(p.services.map((s) => s.category).filter((k) => !known.has(k)))].map((k) => ({ key: k, label: k }));
+    const groups = [...cats, ...extra].map((c) => ({ ...c, items: p.services.filter((s) => s.category === c.key) })).filter((g) => g.items.length);
+    screen(`<div class="card">${stepsBar()}<h2>What are you booking?</h2><p class="sub">${esc(p.intro || 'Pick one or more services.')}</p>${alertHtml()}
+      ${groups.map((g) => `<div class="group"><h3>${esc(g.label)}</h3>${g.items.map((s) => `<button class="opt" data-act="svc" data-id="${s.id}" aria-pressed="${S.serviceIds.includes(s.id)}"><span class="tick">${S.serviceIds.includes(s.id) ? ICON.check : ''}</span><span style="min-width:0"><div class="t">${esc(s.name)}</div>${s.description ? `<div class="d">${esc(s.description)}</div>` : ''}</span><span class="p">${money(s.price_cents)}<small>${dur(s.duration_min)}</small></span></button>`).join('')}</div>`).join('')}</div>`);
+    const t = total();
+    bar(`<div class="sum">${S.serviceIds.length ? `<b>${S.serviceIds.length} service${S.serviceIds.length > 1 ? 's' : ''} · ${dur(t.min)}</b>${money(t.cents)}` : 'Choose a service'}</div><button class="btn primary" data-act="go" data-s="1" ${S.serviceIds.length ? '' : 'disabled'}>Continue</button>`);
+  } else if (S.step === 1) {
+    const list = eligible();
+    screen(`<div class="card">${stepsBar()}<h2>Who would you like to see?</h2><p class="sub">Everyone listed can do ${S.serviceIds.length > 1 ? 'all of these services' : 'this service'}.</p>${alertHtml()}
+      <button class="opt" data-act="staff" data-id="any" aria-pressed="${S.staffId === 'any'}"><span class="avatar" style="background:var(--surface-3);color:var(--ink-2)">${ICON.spark}</span><span><div class="t">Anyone available</div><div class="d">The most open times</div></span></button>
+      ${list.map((s) => `<button class="opt" data-act="staff" data-id="${s.id}" aria-pressed="${S.staffId === s.id}"><span class="avatar" style="background:${esc(s.color || 'var(--accent)')}">${esc(initials(s.name))}</span><span style="min-width:0"><div class="t">${esc(s.name)}</div><div class="d">${esc(s.title || '')}${s.bio ? ` · ${esc(s.bio)}` : ''}</div></span></button>`).join('')}
+      <div class="actions"><button class="btn back" data-act="go" data-s="0">${ICON.left}Back</button><button class="btn primary" data-act="go" data-s="2">See times</button></div></div>`);
+    bar('');
+  } else if (S.step === 2) {
+    const have = new Map(S.days.map((d) => [d.date, d.slots]));
+    const range = []; if (S.from) for (let d = S.from; d <= S.to; d = addDay(d, 1)) range.push(d);
+    const slots = (S.date && have.get(S.date)) || [];
+    const periods = [['Morning', (h) => h < 12], ['Afternoon', (h) => h >= 12 && h < 17], ['Evening', (h) => h >= 17]];
+    const who = S.staffId === 'any' ? '' : ` with ${esc(staff(S.staffId).name.split(' ')[0])}`;
+    screen(`<div class="card">${stepsBar()}<h2>Pick a time</h2><p class="sub">${dur(total().min)}${who} · times in ${esc(zoneShort(tz()) || zoneName(tz()))}</p>${alertHtml()}
+      ${S.busy ? '<div class="skeleton"></div><div class="skeleton"></div>' : range.length ? `<div class="days" id="days">${range.map((d) => `<button class="day" data-act="date" data-date="${d}" aria-pressed="${S.date === d}" ${have.has(d) ? '' : 'disabled'} aria-label="${fmtYmd(d, { weekday: 'long', month: 'long', day: 'numeric' })}"><div class="dw">${fmtYmd(d, { weekday: 'short' })}</div><div class="dn">${fmtYmd(d, { day: 'numeric' })}</div><div class="dm">${fmtYmd(d, { month: 'short' })}</div></button>`).join('')}<button class="more" data-act="more">Later dates</button></div>
+        ${S.date ? `<div class="muted" style="margin-top:10px;font-weight:600">${fmtYmd(S.date, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+          ${periods.map(([label, test]) => { const list = slots.filter((x) => test(+x.time.slice(0, 2))); return list.length ? `<div class="period">${label}</div><div class="slots">${list.map((x) => `<button class="slot" data-act="slot" data-at="${esc(x.at)}" data-time="${x.time}" aria-pressed="${S.slot && S.slot.at === x.at}">${clock(x.time)}</button>`).join('')}</div>` : ''; }).join('')}`
+        : `<div class="empty">No openings in these dates. <button class="btn link" data-act="more">Try later dates</button></div>`}` : `<div class="empty">No openings in the next few weeks${who}. ${S.staffId !== 'any' ? '<button class="btn link" data-act="staff-any">Try anyone available</button>' : `Please call us${S.p.phone ? ` at <a href="tel:${esc(S.p.phone)}">${esc(S.p.phone)}</a>` : ''}.`}</div>`}
+      <div class="actions"><button class="btn back" data-act="go" data-s="1">${ICON.left}Back</button><button class="btn primary" data-act="go" data-s="3" ${S.slot ? '' : 'disabled'}>Continue</button></div></div>`);
+    bar('');
+    const el = $('.day[aria-pressed="true"]'); if (el && el.scrollIntoView) el.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  } else if (S.step === 3) {
+    const d = S.d;
+    screen(`<div class="card">${stepsBar()}<h2>Your details</h2><p class="sub">So we can confirm and remind you.</p>${alertHtml()}
+      <form id="f" novalidate>
+        <div class="row2"><div class="field"><label for="f-first">First name</label><input class="input" id="f-first" name="first" autocomplete="given-name" value="${esc(d.first)}" required></div>
+        <div class="field"><label for="f-last">Last name</label><input class="input" id="f-last" name="last" autocomplete="family-name" value="${esc(d.last)}"></div></div>
+        <div class="field"><label for="f-phone">Mobile number</label><input class="input" id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(d.phone)}" placeholder="(225) 555-0123" required></div>
+        <div class="field"><label for="f-email">Email <span class="hint">(optional)</span></label><input class="input" id="f-email" name="email" type="email" inputmode="email" autocomplete="email" value="${esc(d.email)}"></div>
+        <div class="field"><label for="f-note">Anything we should know? <span class="hint">(optional)</span></label><textarea class="input" id="f-note" name="note" maxlength="500">${esc(d.note)}</textarea><span class="hint">Health questions come in a private form after you book.</span></div>
+        <label class="check"><input type="checkbox" name="sms" ${d.sms ? 'checked' : ''}> <span>Text me about my appointment: reminders and changes only. Msg &amp; data rates may apply; reply STOP to opt out.</span></label>
+        <div class="hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off" value=""></label></div>
+        <div class="actions"><button type="button" class="btn back" data-act="go" data-s="2">${ICON.left}Back</button><button type="submit" class="btn primary">Review</button></div>
+      </form></div>`);
+    bar('');
+  } else if (S.step === 4) {
+    const t = total(); const s = S.slot;
+    const who = S.staffId === 'any' ? 'First available' : staff(S.staffId).name;
+    screen(`<div class="card">${stepsBar()}<h2>Review and book</h2><p class="sub">Nothing is charged online.</p>${alertHtml()}
+      <div class="summary">
+        <div class="ln"><span>When</span><span>${fmtYmd(s.date, { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock(s.time)}</span></div>
+        ${S.serviceIds.map((id) => `<div class="ln"><span>${esc(svc(id).name)}</span><span>${money(svc(id).price_cents)}</span></div>`).join('')}
+        <div class="ln"><span>With</span><span>${esc(who)}</span></div>
+        <div class="ln"><span>Name</span><span>${esc(`${S.d.first} ${S.d.last}`.trim())} · ${esc(S.d.phone)}</span></div>
+        <div class="ln total"><span>${dur(t.min)}</span><span>${money(t.cents)}</span></div>
+      </div>
+      ${S.p.policy ? `<div class="policy">${esc(S.p.policy)}</div>` : ''}
+      <div class="actions"><button class="btn back" data-act="go" data-s="3" ${S.busy ? 'disabled' : ''}>${ICON.left}Back</button><button class="btn primary" data-act="book" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Booking…' : 'Book appointment'}</button></div></div>`);
+    bar('');
+  } else if (S.step === 5) {
+    const a = S.result; const manage = manageUrl(a.token);
+    screen(`<div class="card done"><div class="ok">${ICON.big}</div><h2>You're booked</h2>
+      <p class="muted">${esc(fmtAt(a.starts_at, a.timezone, { weekday: 'long', month: 'long', day: 'numeric' }))} at ${esc(fmtAt(a.starts_at, a.timezone, { hour: 'numeric', minute: '2-digit' }))}<br>${esc(a.services.map((x) => x.name).join(' + '))} with ${esc(a.staff)}</p>
+      ${a.intake_token ? intakeCard(a.intake_token, a.business) : ''}
+      <div class="actions" style="flex-direction:column"><button class="btn ${a.intake_token ? '' : 'primary'} block" data-act="ics">${ICON.cal}Add to calendar</button><a class="btn block" href="${esc(manage)}">Change or cancel</a></div>
+      <p class="muted" style="font-size:13px;margin-top:14px">Save this page: the "Change or cancel" link is yours.${a.address ? `<br>${esc(a.address)}` : ''}</p>
+      <button class="btn link" data-act="again">Book another appointment</button></div>`);
+    bar('');
+  }
+}
+
+// ---------------------------------------------------------------- the manage link (?t=token)
+function renderManage() {
+  const a = S.appt, b = S.biz;
+  hero(b.name, contactBits(b));
+  const when = `${fmtAt(a.starts_at, b.timezone, { weekday: 'long', month: 'long', day: 'numeric' })} at ${fmtAt(a.starts_at, b.timezone, { hour: 'numeric', minute: '2-digit' })}`;
+  const status = a.status === 'cancelled' ? '<div class="alert bad">This appointment is cancelled.</div>' : '';
+  if (S.step === 2) {   // picking a new time
+    const have = new Map(S.days.map((d) => [d.date, d.slots]));
+    const range = []; if (S.from) for (let d = S.from; d <= S.to; d = addDay(d, 1)) range.push(d);
+    const slots = (S.date && have.get(S.date)) || [];
+    screen(`<div class="card"><h2>Pick a new time</h2><p class="sub">${esc(a.services.map((x) => x.name).join(' + '))} with ${esc(a.staff)} · times in ${esc(zoneShort(b.timezone))}</p>${alertHtml()}
+      ${S.busy ? '<div class="skeleton"></div>' : range.length ? `<div class="days">${range.map((d) => `<button class="day" data-act="date" data-date="${d}" aria-pressed="${S.date === d}" ${have.has(d) ? '' : 'disabled'}><div class="dw">${fmtYmd(d, { weekday: 'short' })}</div><div class="dn">${fmtYmd(d, { day: 'numeric' })}</div><div class="dm">${fmtYmd(d, { month: 'short' })}</div></button>`).join('')}<button class="more" data-act="more">Later dates</button></div>
+        ${S.date ? `<div class="slots" style="margin-top:12px">${slots.map((x) => `<button class="slot" data-act="slot" data-at="${esc(x.at)}" data-time="${x.time}" aria-pressed="${S.slot && S.slot.at === x.at}">${clock(x.time)}</button>`).join('')}</div>` : '<div class="empty">No openings in these dates.</div>'}` : '<div class="empty">No openings soon. Please call us.</div>'}
+      <div class="actions"><button class="btn back" data-act="m-back">${ICON.left}Back</button><button class="btn primary" data-act="m-move" ${S.slot && !S.busy ? '' : 'disabled'}>${S.busy ? 'Moving…' : 'Move appointment'}</button></div></div>`);
+    return;
+  }
+  screen(`<div class="card">${status}${alertHtml()}<h2>${a.status === 'cancelled' ? 'Cancelled appointment' : 'Your appointment'}</h2>
+    <div class="summary" style="margin-top:12px">
+      <div class="ln"><span>When</span><span>${esc(when)}</span></div>
+      ${a.services.map((x) => `<div class="ln"><span>${esc(x.name)}</span><span>${money(x.price_cents)}</span></div>`).join('')}
+      <div class="ln"><span>With</span><span>${esc(a.staff)}</span></div>
+    </div>
+    ${a.status === 'cancelled' ? `<div class="actions"><a class="btn primary block" href="?s=${encodeURIComponent(b.slug)}">Book again</a></div>`
+      : a.can_change ? (S.confirmCancel
+        ? `<div class="alert bad" style="margin-top:14px">Cancel this appointment?</div><div class="actions"><button class="btn" data-act="m-keep">Keep it</button><button class="btn primary" data-act="m-cancel" ${S.busy ? 'disabled' : ''} style="background:var(--bad);border-color:var(--bad);color:#fff">${S.busy ? 'Cancelling…' : 'Yes, cancel'}</button></div>`
+        : `<div class="actions"><button class="btn" data-act="m-resched">Reschedule</button><button class="btn danger" data-act="m-ask">Cancel</button></div><div class="actions" style="margin-top:8px"><button class="btn link block" data-act="ics">${ICON.cal}Add to calendar</button></div>`)
+      : `<div class="policy">Need to change it? It's within ${b.cancel_hours} hours, so please call${b.phone ? ` <a href="tel:${esc(b.phone)}">${esc(b.phone)}</a>` : ' the studio'}.</div>`}
+    ${b.policy && a.status !== 'cancelled' ? `<div class="policy">${esc(b.policy)}</div>` : ''}
+    ${a.intake_token && a.status !== 'cancelled' ? intakeCard(a.intake_token, b.name) : ''}</div>`);
+  bar('');
+}
+const intakeCard = (token, bizName) => `<div class="next"><b>One more step: your health form</b><p>About 6 minutes. ${esc(bizName || 'The studio')} uses it to plan a treatment that's safe for your skin and health. Only your provider sees your health details.</p><a class="btn primary block" href="?f=${encodeURIComponent(token)}">Fill it in now</a></div>`;
+
+// ---------------------------------------------------------------- a form on the client's phone (?f=token)
+const todayIn = (zone) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const draftKey = () => `luster.form.${S.ftoken}`;
+function saveDraft() { try { sessionStorage.setItem(draftKey(), JSON.stringify(readAnswers())); } catch (e) {} }
+function loadDraft() { try { return JSON.parse(sessionStorage.getItem(draftKey()) || 'null') || {}; } catch (e) { return {}; } }
+function fieldHtml(f, v) {
+  const show = f.showIf ? ` data-showif="${esc(JSON.stringify(f.showIf))}"` : '';
+  const hint = f.hint ? `<div class="hint">${esc(f.hint)}</div>` : '';
+  if (f.type === 'section') return `<h3 class="fsec">${esc(f.label)}</h3>${f.desc ? `<p class="sub">${esc(f.desc)}</p>` : ''}`;
+  if (f.type === 'choice' || f.type === 'multi' || f.type === 'yesno') {
+    const opts = f.type === 'yesno' ? ['Yes', 'No'] : (f.options || []);
+    const on = (o) => (Array.isArray(v) ? v.includes(o) : v === o);
+    return `<div class="ffield" data-field="${esc(f.id)}" data-type="${f.type === 'multi' ? 'multi' : 'choice'}"${show}><span class="q" id="q-${esc(f.id)}">${esc(f.label)}${f.type === 'multi' ? ' <span class="hint">· pick all that apply</span>' : ''}</span><div class="chips" role="group" aria-labelledby="q-${esc(f.id)}">${opts.map((o) => `<button type="button" class="chip" data-act="fopt" data-v="${esc(o)}" aria-pressed="${on(o)}">${esc(o)}</button>`).join('')}</div>${hint}</div>`;
+  }
+  if (f.type === 'agree') return `<div class="ffield" data-field="${esc(f.id)}" data-type="agree"${show}><label class="check"><input type="checkbox" data-input="${esc(f.id)}" ${v ? 'checked' : ''}><span>${esc(f.label)}</span></label></div>`;
+  if (f.type === 'signature') return `<div class="ffield" data-field="${esc(f.id)}" data-type="signature"><span class="q">${esc(f.label)} <span class="hint">· sign with your finger</span></span><canvas class="sig" id="sig" aria-label="Signature box"></canvas><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><button type="button" class="btn link" data-act="sig-clear">Clear</button><span class="hint" id="sig-state">Not signed yet</span></div></div>`;
+  const attrs = f.type === 'phone' ? 'type="tel" inputmode="tel"' : f.type === 'date' ? 'type="date"' : 'type="text"';
+  if (f.type === 'textarea') return `<div class="ffield" data-field="${esc(f.id)}" data-type="text"${show}><label class="q" for="ff-${esc(f.id)}">${esc(f.label)}</label><textarea class="input" id="ff-${esc(f.id)}" data-input="${esc(f.id)}" maxlength="2000" placeholder="${esc(f.placeholder || '')}">${esc(v || '')}</textarea>${hint}</div>`;
+  return `<div class="ffield" data-field="${esc(f.id)}" data-type="text"${show}><label class="q" for="ff-${esc(f.id)}">${esc(f.label)}</label><input class="input" ${attrs} id="ff-${esc(f.id)}" data-input="${esc(f.id)}" maxlength="300" autocomplete="off" value="${esc(v || '')}" placeholder="${esc(f.placeholder || '')}">${hint}</div>`;
+}
+function renderForm() {
+  const b = S.biz, def = S.form.definition;
+  hero(b.name, contactBits(b));
+  if (S.step === 9) {
+    screen(`<div class="card done"><div class="ok">${ICON.big}</div><h2>Thank you, ${esc(S.first)}</h2><p class="muted">${esc(b.name)} has your ${esc(def.name || 'form')}. It's in your private file, ready for your visit.</p>${b.slug && b.live ? `<a class="btn block" href="?s=${encodeURIComponent(b.slug)}">Book an appointment</a>` : ''}</div>`);
+    return bar('');
+  }
+  const draft = loadDraft();
+  screen(`<div class="card"><h2>${esc(def.name || 'Your form')}</h2><p class="sub">Hi ${esc(S.first)}. ${def.estMinutes ? `About ${def.estMinutes} minutes. ` : ''}Your answers go straight into your private file at ${esc(b.name)}${def.kind === 'intake' ? '; only your provider sees your health details' : ''}. Questions appear only when they apply.</p>
+    ${def.text ? `<div class="consent">${esc(def.text)}</div>` : ''}
+    <form id="ff" novalidate>${def.fields.map((f) => fieldHtml(f, draft[f.id])).join('')}
+      ${alertHtml()}<button type="submit" class="btn primary block" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Sending…' : 'Sign and send'}</button>
+    </form></div>`);
+  bar(''); applyShowIf(); bindSig();
+}
+function liveAnswers() {
+  const a = {};
+  for (const box of document.querySelectorAll('#ff [data-field]')) {
+    const id = box.dataset.field, type = box.dataset.type;
+    if (type === 'multi') a[id] = [...box.querySelectorAll('.chip[aria-pressed="true"]')].map((b) => b.dataset.v);
+    else if (type === 'choice') { const on = box.querySelector('.chip[aria-pressed="true"]'); a[id] = on ? on.dataset.v : ''; }
+    else if (type === 'agree') { const cb = box.querySelector('input'); a[id] = !!(cb && cb.checked); }
+    else if (type === 'text') { const el = box.querySelector('[data-input]'); a[id] = el ? el.value.trim() : ''; }
+  }
+  return a;
+}
+function readAnswers() { const a = liveAnswers(); for (const f of S.form.definition.fields) { if (f.showIf && !showIfMet(f.showIf, a)) delete a[f.id]; } return a; }
+function applyShowIf() { const a = liveAnswers(); for (const box of document.querySelectorAll('#ff [data-showif]')) box.hidden = !showIfMet(JSON.parse(box.dataset.showif), a); }
+function bindSig() {
+  const cv = $('#sig'); if (!cv) return;
+  const r = cv.getBoundingClientRect(); const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.min(900, Math.round(r.width * dpr)); cv.height = Math.round(160 * dpr);
+  const ctx = cv.getContext('2d'); ctx.lineWidth = 2.2 * dpr; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1B2224';
+  let down = false; cv.dataset.signed = '0';
+  const pos = (e) => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * cv.width / b.width, (e.clientY - b.top) * cv.height / b.height]; };
+  cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); });
+  cv.addEventListener('pointermove', (e) => { if (!down) return; const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); cv.dataset.signed = '1'; $('#sig-state').textContent = 'Signed'; cv.closest('.ffield').classList.remove('missing'); });
+  const up = () => { down = false; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv._clear = () => { ctx.clearRect(0, 0, cv.width, cv.height); cv.dataset.signed = '0'; $('#sig-state').textContent = 'Not signed yet'; };
+}
+// every visible question with choices needs an answer; every box needs a tick; the signature is required
+function checkForm() {
+  const a = liveAnswers(); let first = null; const def = S.form.definition;
+  for (const box of document.querySelectorAll('#ff .ffield')) box.classList.remove('missing');
+  for (const f of def.fields) {
+    if (f.type === 'section' || (f.showIf && !showIfMet(f.showIf, a))) continue;
+    const box = document.querySelector(`#ff [data-field="${CSS.escape(f.id)}"]`); if (!box) continue;
+    const empty = f.type === 'signature' ? $('#sig').dataset.signed !== '1' : (f.type === 'choice' || f.type === 'multi' || f.type === 'yesno') ? !(a[f.id] && a[f.id].length) : f.type === 'agree' ? !a[f.id] : false;
+    if (empty) { box.classList.add('missing'); if (!first) first = { box, f }; }
+  }
+  return first;
+}
+async function submitForm() {
+  const miss = checkForm();
+  if (miss) { S.err = miss.f.type === 'signature' ? REASONS.signature : miss.f.type === 'agree' ? `Please tick: ${miss.f.label}` : `Please answer: ${miss.f.label}`; const old = $('#ff .alert'); if (old) old.remove(); $('#ff button[type="submit"]').insertAdjacentHTML('beforebegin', alertHtml()); miss.box.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+  const def = S.form.definition; const answers = readAnswers(); const sig = $('#sig').toDataURL('image/png');
+  const derived = def.kind === 'intake' || S.form.template_id === 'intake' ? deriveIntake(answers, def.fields.filter((f) => f.vertical), todayIn(S.biz.timezone || 'America/Chicago')) : null;
+  S.busy = true; S.err = ''; const btn = $('#ff button[type="submit"]'); btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await rpc('form_public_submit', { p_token: S.ftoken, p_answers: answers, p_signature: sig, p_derived: derived, p_meta: { device: navigator.userAgent.slice(0, 160) } });
+    S.busy = false;
+    if (r.ok || r.reason === 'done') { try { sessionStorage.removeItem(draftKey()); } catch (e) {} S.step = 9; window.scrollTo({ top: 0 }); return renderForm(); }
+    S.err = REASONS[r.reason] || REASONS.rejected;
+  } catch (e) { S.busy = false; S.err = "We couldn't send your form. Check your connection and try again. Your answers are still here."; }
+  btn.disabled = false; btn.textContent = 'Sign and send'; const old = $('#ff .alert'); if (old) old.remove(); btn.insertAdjacentHTML('beforebegin', alertHtml());
+}
+
+// ---------------------------------------------------------------- calendar file
+function manageUrl(t) { return `${location.origin}${location.pathname}?t=${encodeURIComponent(t)}`; }
+function downloadIcs(a, bizName, address, token) {
+  const z = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const clean = (s) => String(s || '').replace(/[\\,;]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Luster//Booking//EN', 'BEGIN:VEVENT',
+    `UID:${token}@nwluster.com`, `DTSTAMP:${z(new Date().toISOString())}`, `DTSTART:${z(a.starts_at)}`, `DTEND:${z(a.ends_at)}`,
+    `SUMMARY:${clean(`${a.services.map((x) => x.name).join(' + ')} · ${bizName}`)}`, address ? `LOCATION:${clean(address)}` : '',
+    `DESCRIPTION:${clean(`Change or cancel: ${manageUrl(token)}`)}`, 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  const link = document.createElement('a'); link.href = url; link.download = 'appointment.ics'; document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+// ---------------------------------------------------------------- data loading
+async function loadSlots(from) {
+  S.busy = true; render();
+  try {
+    const slug = S.mode === 'manage' ? S.biz.slug : S.slug;
+    const ids = S.mode === 'manage' ? S.appt.service_ids : S.serviceIds;
+    const who = S.mode === 'manage' ? S.appt.staff_id : (S.staffId === 'any' ? null : S.staffId);
+    const r = await rpc('booking_slots', { p_slug: slug, p_service_ids: ids, p_staff_id: who, p_from: from || null, p_days: 14 });
+    if (!r.ok) { S.err = REASONS[r.reason] || REASONS.rejected; S.days = []; S.from = S.to = null; }
+    else {
+      S.days = r.days; S.from = r.from; S.to = r.to;
+      S.date = r.days.length ? r.days[0].date : null;
+      if (S.slot && !r.days.some((d) => d.slots.some((x) => x.at === S.slot.at))) S.slot = null;
+    }
+  } catch (e) { S.err = "We couldn't load open times. Check your connection and try again."; }
+  S.busy = false; render();
+}
+async function boot() {
+  if (!configured()) { hero('Online booking'); return message("Booking isn't connected yet", 'This page goes live as soon as the studio finishes setup.'); }
+  if (S.mode === 'form') {
+    try {
+      const r = await rpc('form_public_get', { p_token: S.ftoken });
+      if (!r.ok && r.reason === 'done') { hero(r.business.name); return message('Already received', `${esc(r.business.name)} has this form. Thank you!`); }
+      if (!r.ok) { hero('Your form'); return message("We couldn't find that form", 'The link may be incomplete. Check the message the studio sent you.'); }
+      S.form = r.form; S.biz = r.business; S.first = r.client.first_name; document.title = `${r.form.definition.name || 'Form'} · ${r.business.name}`; renderForm();
+    } catch (e) { hero('Your form'); message('Something went wrong', "We couldn't load your form. Check your connection and refresh."); }
+    return;
+  }
+  if (S.mode === 'manage') {
+    try {
+      const r = await rpc('booking_get', { p_token: S.token });
+      if (!r.ok) { hero('Your appointment'); return message("We couldn't find that appointment", 'The link may be incomplete. Check the message the studio sent you.'); }
+      S.appt = r.appointment; S.biz = r.business; renderManage();
+    } catch (e) { hero('Your appointment'); message('Something went wrong', "We couldn't load your appointment. Check your connection and refresh."); }
+    return;
+  }
+  if (!S.slug) { hero('Book online'); return message('Which studio?', 'Use the booking link your studio shared with you.', '<p><a class="btn" href="https://www.nwluster.com/">About Luster</a></p>'); }
+  try {
+    const p = await rpc('booking_profile', { p_slug: S.slug });
+    if (!p.ok) { hero('Book online'); return message("We couldn't find that studio", 'Check the link and try again.'); }
+    S.p = p; hero(p.name, contactBits(p));
+    if (!p.live) return message('Online booking is coming soon', p.phone ? `Call <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a> to book.` : 'Please call the studio to book.');
+    if (!p.services.length) return message('Nothing to book online yet', p.phone ? `Call <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a> to book.` : 'Please call the studio to book.');
+    render();
+  } catch (e) { hero('Book online'); message('Something went wrong', "We couldn't load this page. Check your connection and refresh."); }
+}
+
+// ---------------------------------------------------------------- events
+function readForm() {
+  const f = $('#f'); if (!f) return; const v = (n) => (f.elements[n] ? f.elements[n].value : '');
+  S.d = { first: v('first').trim(), last: v('last').trim(), phone: v('phone').trim(), email: v('email').trim(), note: v('note').trim(), sms: !!(f.elements.sms && f.elements.sms.checked), website: v('website') };
+}
+function go(step) {
+  S.err = ''; S.note = '';
+  if (step === 1 && !S.serviceIds.length) return;
+  if (step === 1) { const list = eligible(); if (S.staffId !== 'any' && !list.some((s) => s.id === S.staffId)) S.staffId = 'any'; }
+  S.step = step; window.scrollTo({ top: 0 });
+  if (step === 2) return loadSlots(null);
+  render();
+}
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'svc') { const id = el.dataset.id; S.serviceIds = S.serviceIds.includes(id) ? S.serviceIds.filter((x) => x !== id) : [...S.serviceIds, id]; S.slot = null; render(); }
+  else if (act === 'staff') { S.staffId = el.dataset.id; S.slot = null; render(); }
+  else if (act === 'staff-any') { S.staffId = 'any'; loadSlots(null); }
+  else if (act === 'go') { if (S.step === 3) readForm(); go(+el.dataset.s); }
+  else if (act === 'date') { S.date = el.dataset.date; S.slot = null; S.mode === 'manage' ? renderManage() : render(); }
+  else if (act === 'slot') { S.slot = { at: el.dataset.at, time: el.dataset.time, date: S.date }; S.mode === 'manage' ? renderManage() : render(); }
+  else if (act === 'more') { if (S.to) loadSlots(addDay(S.to, 1)); }
+  else if (act === 'book') {
+    S.busy = true; S.err = ''; render();
+    try {
+      const r = await rpc('booking_create', { p_slug: S.slug, p_service_ids: S.serviceIds, p_start: S.slot.at, p_staff_id: S.staffId === 'any' ? null : S.staffId,
+        p_client: { first_name: S.d.first, last_name: S.d.last, phone: S.d.phone, email: S.d.email, note: S.d.note, sms_opt_in: S.d.sms, website: S.d.website } });
+      S.busy = false;
+      if (r.ok) { S.result = r.appointment; S.step = 5; window.scrollTo({ top: 0 }); return render(); }
+      S.err = REASONS[r.reason] || REASONS.rejected;
+      if (r.reason === 'taken') { S.slot = null; S.step = 2; return loadSlots(null).then(() => { S.err = REASONS.taken; render(); }); }
+      if (r.reason === 'missing_contact' || r.reason === 'bad_email') S.step = 3;
+      if (r.reason === 'bad_service') { S.serviceIds = []; S.step = 0; const p = await rpc('booking_profile', { p_slug: S.slug }); if (p.ok) S.p = p; }
+      render();
+    } catch (err) { S.busy = false; S.err = "We couldn't reach the studio's calendar. Check your connection and try again. You haven't been booked."; render(); }
+  }
+  else if (act === 'fopt') {
+    const box = el.closest('[data-field]'); const multi = box.dataset.type === 'multi'; const on = el.getAttribute('aria-pressed') === 'true';
+    if (multi) { const none = /^None/.test(el.dataset.v); for (const b of box.querySelectorAll('.chip')) { if (b === el) b.setAttribute('aria-pressed', String(!on)); else if (none || /^None/.test(b.dataset.v)) b.setAttribute('aria-pressed', 'false'); } }
+    else for (const b of box.querySelectorAll('.chip')) b.setAttribute('aria-pressed', String(b === el && !on));
+    box.classList.remove('missing'); applyShowIf(); saveDraft();
+  }
+  else if (act === 'sig-clear') { const cv = $('#sig'); if (cv && cv._clear) cv._clear(); }
+  else if (act === 'ics') { if (S.mode === 'manage') downloadIcs(S.appt, S.biz.name, S.biz.address, S.token); else downloadIcs(S.result, S.result.business, S.result.address, S.result.token); }
+  else if (act === 'again') { S.step = 0; S.serviceIds = []; S.slot = null; S.result = null; render(); }
+  else if (act === 'm-ask') { S.confirmCancel = true; renderManage(); }
+  else if (act === 'm-keep') { S.confirmCancel = false; renderManage(); }
+  else if (act === 'm-cancel') {
+    S.busy = true; renderManage();
+    try { const r = await rpc('booking_cancel', { p_token: S.token }); S.busy = false; S.confirmCancel = false;
+      if (r.ok) { S.appt.status = 'cancelled'; S.err = ''; S.note = 'Done. Your appointment is cancelled.'; } else S.err = REASONS[r.reason] || REASONS.rejected;
+    } catch (err) { S.busy = false; S.err = "We couldn't reach the studio. Try again."; }
+    renderManage();
+  }
+  else if (act === 'm-resched') { S.step = 2; S.err = ''; S.note = ''; S.slot = null; loadSlots(null).then(renderManage); }
+  else if (act === 'm-back') { S.step = 0; S.err = ''; renderManage(); }
+  else if (act === 'm-move') {
+    S.busy = true; renderManage();
+    try { const r = await rpc('booking_reschedule', { p_token: S.token, p_start: S.slot.at }); S.busy = false;
+      if (r.ok) { const g = await rpc('booking_get', { p_token: S.token }); if (g.ok) S.appt = g.appointment; S.step = 0; S.note = 'Moved. See you then.'; S.err = ''; }
+      else { S.err = REASONS[r.reason] || REASONS.rejected; if (r.reason === 'taken') { S.slot = null; await loadSlots(S.from); S.err = REASONS.taken; } }
+    } catch (err) { S.busy = false; S.err = "We couldn't reach the studio. Try again."; }
+    renderManage();
+  }
+});
+document.addEventListener('change', (e) => { if (S.mode !== 'form' || !e.target.closest('#ff')) return; const box = e.target.closest('.ffield'); if (box) box.classList.remove('missing'); applyShowIf(); saveDraft(); });
+document.addEventListener('input', (e) => { if (S.mode === 'form' && e.target.closest('#ff')) saveDraft(); });
+document.addEventListener('submit', (e) => {
+  if (e.target.id === 'ff') { e.preventDefault(); if (!S.busy) submitForm(); return; }
+  if (e.target.id !== 'f') return; e.preventDefault(); readForm();
+  const digits = S.d.phone.replace(/\D/g, '');
+  if (!S.d.first) { S.err = 'Please add your first name.'; return render(); }
+  if (digits.length < 10) { S.err = 'Please add a mobile number we can text.'; return render(); }
+  if (S.d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.d.email)) { S.err = REASONS.bad_email; return render(); }
+  go(4);
+});
+boot();
+})();
+</script>
+</body>
+</html>

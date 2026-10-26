@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luster</title>
+<script>
+  // Pretty booking links: /book/<studio> → /book/?s=<studio> (GitHub Pages serves this file for any unknown path)
+  (function () {
+    var parts = location.pathname.split('/'); var i = parts.indexOf('book');
+    if (i >= 0 && parts[i + 1]) location.replace(parts.slice(0, i + 1).join('/') + '/?s=' + encodeURIComponent(decodeURIComponent(parts[i + 1]).toLowerCase()) + location.hash);
+  })();
+</script>
+<style>body{margin:0;font:15px/1.5 system-ui,-apple-system,sans-serif;background:#F3F2ED;color:#1B2224;display:grid;place-items:center;min-height:100vh;text-align:center;padding:16px}a{color:#1E5C68}@media (prefers-color-scheme:dark){body{background:#111516;color:#ECEAE4}a{color:#6DBAC5}}</style>
+</head>
+<body>
+<main><h1 style="font-weight:500">Page not found</h1><p><a href="/">Go to Luster</a></p></main>
+</body>
+</html>

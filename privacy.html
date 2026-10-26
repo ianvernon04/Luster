@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy · Luster</title>
+<meta name="description" content="How Luster handles the information studios and their clients trust it with.">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<style>
+:root { --bg: #F3F2ED; --surface: #FFFFFF; --ink: #1B2224; --ink-2: #566068; --ink-3: #8A9399; --line: #E2DFD7; --accent: #1E5C68; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #111516; --surface: #191F21; --ink: #ECEAE4; --ink-2: #AEB6BA; --ink-3: #7E888D; --line: #2B3539; --accent: #6DBAC5; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; padding: 0 16px 64px; }
+main { max-width: 720px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px 36px; margin-top: 24px; }
+h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 34px; line-height: 1.15; margin: 0 0 6px; }
+h2 { font-size: 18px; margin: 28px 0 6px; }
+p, li { color: var(--ink-2); }
+ul { padding-left: 20px; }
+a { color: var(--accent); }
+.meta { color: var(--ink-3); font-size: 14px; margin: 0 0 18px; }
+.lead { font-size: 17px; color: var(--ink); }
+footer { max-width: 720px; margin: 18px auto 0; color: var(--ink-3); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy</h1>
+  <p class="meta">Last updated October 26, 2026</p>
+  <p class="lead">Luster is front-desk software for salons, spas and studios. Studios use it to run their calendar, keep client records and take bookings online. This page explains what happens to the information that passes through it, in plain language.</p>
+
+  <h2>Two kinds of people use Luster</h2>
+  <p><b>Studios</b> (owners and their teams) sign up for Luster and use it to run their business. <b>Their clients</b> book appointments and fill in forms through pages Luster hosts for the studio. If you're a client, the studio you book with decides what it asks you and is responsible for your information; Luster stores and processes it on the studio's behalf and follows the studio's instructions.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><b>When you book:</b> your name, mobile number, optional email, the services and time you chose, and anything you write in the notes box.</li>
+    <li><b>When you fill in a studio's form:</b> your answers (which can include health history, medications, allergies and pregnancy), and your signature.</li>
+    <li><b>What the studio records:</b> appointment history, treatment notes, purchases and refunds, and any client files the studio imports from its previous software.</li>
+    <li><b>Studio accounts:</b> the email and password of each person who signs in (passwords are stored only as secure hashes by our authentication provider).</li>
+    <li><b>Technical information:</b> your device's IP address, kept briefly to stop abuse (for example, too many booking attempts), and error reports from the studio's devices so we can fix problems. Error reports are stripped of email addresses and phone numbers before they leave the device.</li>
+  </ul>
+
+  <h2>How it's used</h2>
+  <ul>
+    <li>To book, change and cancel appointments, and to give the studio the records it needs to look after you safely.</li>
+    <li>To let the studio contact you about your appointments. If you agree to texts when you book, the studio may text you reminders and changes. Message and data rates may apply; reply STOP to opt out.</li>
+    <li>To keep the service secure, working and improving.</li>
+  </ul>
+  <p>We don't sell personal information, we don't show ads, and we don't use your information to market anything to you.</p>
+
+  <h2>Health information</h2>
+  <p>Health answers and signed forms are kept apart from the rest of a client's file. Within a studio, only owners, managers and providers can open them, and every time someone opens one it's logged. Caution flags (for example "oncology client") and the names of your allergies are visible to the whole studio team, so nobody books an unsafe service or hands you a product you react to. Luster's own staff access this information only when it's needed to keep the service running or when the studio asks us for help.</p>
+
+  <h2>Who else handles it</h2>
+  <p>We use a small number of service providers to run Luster: Supabase (database and sign-in, hosted in the United States), GitHub Pages (hosting these web pages), Google Fonts (the typefaces on the pages), and, when the studio connects them, a texting provider and a payment processor. They process information only to provide their service to us. We may disclose information if the law requires it.</p>
+
+  <h2>How long it's kept</h2>
+  <p>Records are kept for as long as the studio uses Luster. When a studio deletes a client, the client disappears from every device and their upcoming appointments are cancelled; the underlying record is kept so the studio can meet its own record-keeping and insurance obligations. If a studio closes its account, we delete its data after giving the studio a chance to export it.</p>
+
+  <h2>Your choices</h2>
+  <p>To see, correct or delete your information, contact the studio you booked with; it controls your file. You can also write to us at <a href="mailto:ixv@nwluster.com">ixv@nwluster.com</a> and we'll pass your request to the studio and help it respond.</p>
+
+  <h2>Security</h2>
+  <p>Everything travels over encrypted connections and is encrypted where it's stored. Each studio can see only its own data; that rule is enforced by the database itself, not just the app. Sign-ins, changes and every opening of a health file are recorded.</p>
+
+  <h2>Children</h2>
+  <p>Luster isn't meant for children under 13. Studios that serve clients under 18 ask for a parent or guardian on the intake form.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If we change this policy in a way that matters, we'll update this page and tell studios before the change takes effect. Questions: <a href="mailto:ixv@nwluster.com">ixv@nwluster.com</a>.</p>
+</main>
+<footer><a href="./">Luster</a> · <a href="terms.html">Terms</a></footer>
+</body>
+</html>

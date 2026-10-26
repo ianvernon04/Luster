@@ -1,0 +1,107 @@
+# Luster — tests every change, and deploys the releases Claude prepares.
+#   push / pull request : build the app, run every test suite
+#   every 10 minutes    : if a newer release is waiting in Supabase, apply it, rebuild, run every test,
+#   (or "Run workflow")   and push to main only if all of them pass. GitHub Pages then publishes www.nwluster.com.
+# This file lives at .github/workflows/luster.yml. Releases never change it (GitHub doesn't let workflows edit workflows).
+name: Luster
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '3-59/10 * * * *'
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: luster-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+env:
+  # public values (the same ones the booking page uses); the database only lets this key read releases and report back
+  RELEASES_URL: __SUPABASE_URL__/rest/v1/releases
+  REPORT_URL: __SUPABASE_URL__/rest/v1/rpc/release_report
+  RELEASES_KEY: __SUPABASE_ANON_KEY__
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.c.outputs.run }}
+      id: ${{ steps.c.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: c
+        run: |
+          set -euo pipefail
+          # pushes and pull requests: test the tree as it is (once it has the test setup a release brings)
+          if [ "$GITHUB_EVENT_NAME" = push ] || [ "$GITHUB_EVENT_NAME" = pull_request ]; then if [ -f ops/fetch-vendor.sh ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi; exit 0; fi
+          latest=$(curl -fsS "$RELEASES_URL?select=id,status&order=created_at.desc&limit=1" -H "apikey: $RELEASES_KEY" -H "Authorization: Bearer $RELEASES_KEY")
+          id=$(echo "$latest" | jq -r '.[0].id // empty'); st=$(echo "$latest" | jq -r '.[0].status // empty'); current=$(cat .release 2>/dev/null || true)
+          # a release that failed its tests waits for a fixed one (or a manual "Run workflow"), instead of failing every 10 minutes
+          if [ "$st" = failed ] && [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then echo "run=false" >> "$GITHUB_OUTPUT"; echo "Release $id failed its tests; waiting for the next one"; exit 0; fi
+          if [ -n "$id" ] && [ "$id" != "$current" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; echo "id=$id" >> "$GITHUB_OUTPUT"; echo "Release $id is waiting (live: ${current:-none})"
+          else echo "run=false" >> "$GITHUB_OUTPUT"; echo "Nothing new (live: ${current:-none})"; fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply release ${{ needs.check.outputs.id }}
+        if: needs.check.outputs.id != ''
+        env: { ID: "${{ needs.check.outputs.id }}" }
+        run: |
+          set -euo pipefail
+          curl -fsS "$RELEASES_URL?select=sha256,notes,payload&id=eq.$ID" -H "apikey: $RELEASES_KEY" -H "Authorization: Bearer $RELEASES_KEY" -H "Accept: application/vnd.pgrst.object+json" > /tmp/release.json
+          jq -r .payload /tmp/release.json | base64 -d > /tmp/release.tgz
+          echo "$(jq -r .sha256 /tmp/release.json)  /tmp/release.tgz" | sha256sum -c -
+          jq -r '.notes // ("Release " + env.ID)' /tmp/release.json > /tmp/release-message.txt
+          tar -xzf /tmp/release.tgz -C .
+          if [ -s .release-deletions ]; then xargs -r -d '\n' git rm -q --ignore-unmatch -- < .release-deletions; fi
+          rm -f .release-deletions
+          chmod +x src/build.sh src/build-pwa.sh ops/*.sh 2>/dev/null || true
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install test tools
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1 @electric-sql/pglite@0.2.17
+          npx playwright install --with-deps chromium
+      - name: Vendored libraries (supabase-js, QR codes) from npm
+        run: bash ops/fetch-vendor.sh && ls -la vendor
+      - name: Build
+        run: cd src && ./build-pwa.sh
+      # each suite gets one retry: a one-off timing hiccup on a shared runner shouldn't block a release, and the first
+      # failure still lands in the log (and in the report back to Supabase) so it can be fixed
+      - name: Database rules
+        run: node supabase/test/db.test.mjs 2>&1 | tee -a /tmp/luster-test.log || { echo "::warning::retrying database tests"; node supabase/test/db.test.mjs 2>&1 | tee -a /tmp/luster-test.log; }
+      - name: Booking page
+        run: node supabase/test/booking.e2e.mjs 2>&1 | tee -a /tmp/luster-test.log || { echo "::warning::retrying booking tests"; node supabase/test/booking.e2e.mjs 2>&1 | tee -a /tmp/luster-test.log; }
+      - name: Go live, book, sync
+        run: node supabase/test/app.e2e.mjs 2>&1 | tee -a /tmp/luster-test.log || { echo "::warning::retrying go-live tests"; node supabase/test/app.e2e.mjs 2>&1 | tee -a /tmp/luster-test.log; }
+      - name: App
+        run: |
+          cd src
+          for t in setup pwa import run ws; do
+            node test/$t.js 2>&1 | tee -a /tmp/luster-test.log || { echo "::warning::retrying $t"; node test/$t.js 2>&1 | tee -a /tmp/luster-test.log; }
+          done
+      - name: Publish
+        if: needs.check.outputs.id != ''
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -euo pipefail
+          git config user.name "Luster release"; git config user.email "ixv@nwluster.com"
+          git add -A
+          git commit -F /tmp/release-message.txt || { echo "Nothing changed"; exit 0; }
+          git push origin HEAD:main
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null || true
+      - name: Report back
+        if: always() && needs.check.outputs.id != ''
+        env: { ID: "${{ needs.check.outputs.id }}", OUTCOME: "${{ job.status }}" }
+        run: |
+          status=failed; [ "$OUTCOME" = success ] && status=deployed
+          report=$( (echo "$OUTCOME · run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"; grep -E '^(FAIL|page errors|CRASH)' /tmp/luster-test.log 2>/dev/null | head -40; echo '---'; tail -c 12000 /tmp/luster-test.log 2>/dev/null) | jq -Rs . )
+          curl -fsS -X POST "$REPORT_URL" -H "apikey: $RELEASES_KEY" -H "Authorization: Bearer $RELEASES_KEY" -H "Content-Type: application/json" \
+            -d "{\"p_id\": \"$ID\", \"p_status\": \"$status\", \"p_report\": $report}" || true

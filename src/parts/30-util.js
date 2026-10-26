@@ -27,8 +27,24 @@ function mulberry32(seed) {
 const pad2 = (n) => String(n).padStart(2, '0');
 function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function fromDateStr(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
-function todayStr() { return toDateStr(new Date()); }
-function nowMin() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+/* A live business runs on its own clock: the iPad in Okinawa shows Baton Rouge's day and time. null = this device's zone. */
+let APP_TZ = null;
+const _tzFmt = new Map();
+function tzParts(date, tz) {
+  let f = _tzFmt.get(tz);
+  if (!f) { f = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); _tzFmt.set(tz, f); }
+  const p = {}; for (const x of f.formatToParts(date)) p[x.type] = x.value;
+  return { date: `${p.year}-${p.month}-${p.day}`, min: (+p.hour % 24) * 60 + +p.minute };
+}
+/* wall-clock date + minutes in a zone → the actual instant (handles daylight-saving offsets) */
+function zonedToUtc(dateStr, min, tz) {
+  const [y, m, d] = dateStr.split('-').map(Number); const wall = Date.UTC(y, m - 1, d, Math.floor(min / 60), min % 60);
+  const offsetAt = (t) => { const p = tzParts(new Date(t), tz); const [py, pm, pd] = p.date.split('-').map(Number); return Date.UTC(py, pm - 1, pd, Math.floor(p.min / 60), p.min % 60) - t; };
+  let t = wall - offsetAt(wall); const o2 = offsetAt(t); if (wall - o2 !== t) t = wall - o2;
+  return new Date(t);
+}
+function todayStr() { return APP_TZ ? tzParts(new Date(), APP_TZ).date : toDateStr(new Date()); }
+function nowMin() { if (APP_TZ) return tzParts(new Date(), APP_TZ).min; const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
 function addDays(s, n) { const d = fromDateStr(s); d.setDate(d.getDate() + n); return toDateStr(d); }
 function diffDays(a, b) { return Math.round((fromDateStr(b) - fromDateStr(a)) / 86400000); }
 function dow(s) { return fromDateStr(s).getDay(); } // 0 = Sun
@@ -138,4 +154,17 @@ function formValues(form) {
   }
   return o;
 }
+/* Files the studio takes away: a normal download on a computer; on an iPad the share sheet (Save to Files, AirDrop, Mail). */
+const csvCell = (v) => { if (v == null) return ''; if (typeof v === 'number') return String(v); let s = String(v); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };   // a name can't smuggle in a spreadsheet formula
+function toCsv(rows) { return '\ufeff' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n'); }
+async function saveFile(name, data, type = 'application/octet-stream') {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: `${type};charset=utf-8` });
+  if (window.matchMedia && matchMedia('(pointer: coarse)').matches && navigator.canShare) {
+    try { const file = new File([blob], name, { type: blob.type || type }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; } }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function loadScript(src) { return new Promise((res, rej) => { if (document.querySelector(`script[data-src="${src}"]`)) return res(); const el = document.createElement('script'); el.src = src; el.dataset.src = src; el.onload = () => res(); el.onerror = () => rej(new Error(`Couldn't load ${src}`)); document.head.appendChild(el); }); }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

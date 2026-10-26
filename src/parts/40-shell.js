@@ -42,8 +42,8 @@ function renderRail() {
     <div class="nav">${NAV.map((n) => `<button class="nav-item ${S.ui.view === n.id ? 'on' : ''}" data-act="go" data-view="${n.id}">${I[n.icon]}<span>${n.label}</span>${counts[n.id] ? `<span class="count">${counts[n.id]}</span>` : ''}</button>`).join('')}</div>
     <div class="rail-foot">
       <span class="perf"><span class="perf-dot"></span>Rendered in <b id="perf-ms" class="num">${Math.max(1, Math.round(App.lastRenderMs))} ms</b></span>
-      <span>All data on this device. No spinners.</span>
-      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>
+      ${isLive() ? `${cloudStatusHtml()}<span>${esc(st().business.name)} · ${st().clients.length} clients · ${st().appointments.length} appointments</span>` : `<span>All data on this device. No spinners.</span>
+      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>`}
     </div>`;
 }
 function renderTabbar() {
@@ -100,7 +100,7 @@ function closePalette() { S.ui.palette = false; $('#palette-root').innerHTML = '
 function paletteResults(q) {
   const s = q.trim().toLowerCase(); const out = [];
   const actions = [
-    { label: 'New appointment', hint: 'N', act: 'new-appt', icon: 'plus' }, { label: 'New client', act: 'new-client', icon: 'user' }, { label: 'Open checkout', act: 'go', attrs: 'data-view="checkout"', icon: 'checkout' },
+    { label: 'New appointment', hint: 'N', act: 'new-appt', icon: 'plus' }, { label: 'New client', act: 'new-client', icon: 'user' }, { label: 'Import clients from a CSV', act: 'import-open', icon: 'dl' }, { label: 'Open checkout', act: 'go', attrs: 'data-view="checkout"', icon: 'checkout' },
     { label: 'Go to today', act: 'cal-today', icon: 'calendar' }, { label: 'Preview online booking', act: 'go', attrs: 'data-view="booking"', icon: 'booking' }, { label: 'Reports', act: 'go', attrs: 'data-view="reports"', icon: 'reports' }, { label: 'Settings', act: 'go', attrs: 'data-view="settings"', icon: 'settings' }, { label: 'Switch business', act: 'workspaces', icon: 'more' }, { label: 'Set up a new business', act: 'new-business', icon: 'plus' }, { label: 'Reset demo data', act: 'reset-demo-ask', icon: 'repeat' },
   ];
   const clients = s ? searchClients(s, 7) : st().clients.filter((c) => apptsOn(todayStr()).some((a) => a.clientId === c.id)).slice(0, 5);
@@ -124,7 +124,7 @@ function renderPalette(q) {
 }
 
 /* ---- workspaces: one app, many businesses ---- */
-Modals.workspaces = () => ({ title: 'Businesses', body: `<div class="small muted">Every business gets its own workspace: its own clients, calendar, services, forms and settings. Switch any time.</div><div class="list">${workspaces().map((w) => { const T = TEMPLATES[w.templateId] || TEMPLATES.facial; const cur = w.id === S.wsId; return `<div class="ws-row"><div class="ws-mark" style="background:hsl(${hashHue(w.name)} 32% 44%)">${esc(w.name[0])}</div><div class="grow"><div class="strong">${esc(w.name)}${cur ? ' <span class="badge accent">Open</span>' : ''}</div><div class="small muted">${esc(T.label)} · set up ${relDate(w.createdAt).toLowerCase()}</div></div>${cur ? '' : `<button class="btn sm primary" data-act="ws-switch" data-id="${w.id}">Open</button><button class="btn sm ghost icon" data-act="ws-delete-ask" data-id="${w.id}" aria-label="Delete">${I.trash}</button>`}</div>`; }).join('')}</div>`, foot: `<button class="btn" data-act="close-modal">Close</button><button class="btn primary" data-act="new-business">${I.plus}Set up a new business</button>` });
+Modals.workspaces = () => ({ title: 'Businesses', body: `<div class="small muted">Every business gets its own workspace: its own clients, calendar, services, forms and settings. Switch any time.</div><div class="list">${workspaces().map((w) => { const T = TEMPLATES[w.templateId] || TEMPLATES.facial; const cur = w.id === S.wsId; return `<div class="ws-row"><div class="ws-mark" style="background:hsl(${hashHue(w.name)} 32% 44%)">${esc(w.name[0])}</div><div class="grow"><div class="strong">${esc(w.name)}${w.live ? ' <span class="badge good">Live</span>' : ''}${cur ? ' <span class="badge accent">Open</span>' : ''}</div><div class="small muted">${w.live ? esc(shortLink(w.live.slug)) : `${esc(T.label)} demo · set up ${relDate(w.createdAt).toLowerCase()}`}</div></div>${cur ? '' : `<button class="btn sm primary" data-act="ws-switch" data-id="${w.id}">Open</button><button class="btn sm ghost icon" data-act="ws-delete-ask" data-id="${w.id}" aria-label="Delete">${I.trash}</button>`}</div>`; }).join('')}</div>`, foot: `<button class="btn" data-act="close-modal">Close</button>${Cloud.available() ? '<button class="btn" data-act="cloud-from-cloud">Open from the cloud</button>' : ''}<button class="btn primary" data-act="new-business">${I.plus}Set up a new business</button>` });
 Modals.wizard = () => {
   const w = S.ui.wiz; const T = w.templateId ? TEMPLATES[w.templateId] : null;
   if (w.step === 0) return { title: 'What kind of business?', wide: true, body: `<div class="small muted">Pick the closest fit. Services, forms, consents and safety rules come pre-built; everything is editable afterward.</div><div class="tpl-grid">${Object.values(TEMPLATES).map((t) => `<button class="tpl-card ${w.templateId === t.id ? 'on' : ''}" data-act="wiz-type" data-id="${t.id}"><b>${esc(t.label)}</b><span>${esc(t.blurb)}</span><span class="tiny">${t.services.length} services · ${t.consents.length} consent${t.consents.length === 1 ? '' : 's'}</span></button>`).join('')}</div>`, foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="wiz-step" data-s="1" ${w.templateId ? '' : 'disabled'}>Next</button>` };

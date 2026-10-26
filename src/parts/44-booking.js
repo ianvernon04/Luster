@@ -1,19 +1,22 @@
 /* ===== Online booking (client-facing preview) ===== */
+const bkStaff = () => bookableStaff().filter((s) => !s.skills || bk().serviceIds.every((id) => s.skills.includes(id)));   // providers who do everything picked
 function bk() { if (!S.ui.booking || !S.ui.booking.init) S.ui.booking = { init: true, serviceIds: [], staffId: 'any', date: null, start: null, resolvedStaff: null, name: '', phone: '', email: '', note: '' }; return S.ui.booking; }
 function bkDur() { return sum(bk().serviceIds, (id) => svcById(id)?.dur || 0); }
 function bkPrice() { return sum(bk().serviceIds, (id) => svcById(id)?.price || 0); }
 function bkSlotsFor(date) {
   const b = bk(); const dur = bkDur(); if (!dur) return [];
-  const staff = b.staffId === 'any' ? bookableStaff() : [staffById(b.staffId)];
+  const staff = b.staffId === 'any' ? bkStaff() : [staffById(b.staffId)];
   const map = new Map();
   for (const s of staff) for (const t of freeSlots(s.id, date, dur, 30)) if (!map.has(t)) map.set(t, s.id);
   return Array.from(map.entries()).sort((a, b2) => a[0] - b2[0]);
 }
 Views.booking = {
   title: () => 'Online booking',
-  sub: () => `Preview of what clients see at ${bizUrl('/book')} — bookings land straight on the calendar.`,
-  actions: () => `<button class="btn" data-act="bk-reset">Start over</button>`,
+  sub: () => (isLive() ? `Your live booking page. What clients book here lands on the calendar within seconds.` : `Preview of what clients see at ${bizUrl('/book')} — bookings land straight on the calendar.`),
+  actions: () => (isLive() ? `<button class="btn" data-act="cloud-copy">Copy link</button><button class="btn" data-act="cloud-open">Open</button>` : `<button class="btn" data-act="bk-reset">Start over</button>`),
   render() {
+    if (isLive()) return `<div class="col" style="gap:12px;max-width:760px;margin:0 auto"><div class="card pad row between wrap" style="gap:10px"><div><div class="eyebrow">Booking link</div><div class="strong" style="word-break:break-all">${esc(shortLink(st().live.slug))}</div></div>${cloudStatusHtml()}</div>
+      <iframe src="book/?s=${encodeURIComponent(st().live.slug)}" title="Your booking page" loading="lazy" style="width:100%;height:min(820px,calc(100vh - 220px));min-height:520px;border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--surface)"></iframe></div>`;
     const b = bk(); const step = S.ui.bookingStep || 0; const biz = st().business;
     const steps = ['Service', 'Esthetician', 'Time', 'Details', 'Confirm'];
     const stepsHtml = `<div class="steps">${steps.map((s, i) => `<span class="step ${i === step ? 'on' : i < step ? 'done' : ''}">${i < step ? '✓ ' : ''}${s}</span>`).join('')}</div>`;
@@ -22,7 +25,7 @@ Views.booking = {
       const grouped = groupBy(st().services.filter((s) => !s.hidden && !s.noAuto), (s) => s.cat);
       body = CAT_ORDER.map((k) => `<div class="svc-group"><h3>${CATEGORIES[k].label}</h3><div class="col" style="gap:8px">${(grouped[k] || []).map((s) => `<button class="svc-row ${b.serviceIds.includes(s.id) ? 'on' : ''}" data-act="bk-svc" data-id="${s.id}"><div class="grow" style="min-width:0"><div class="strong">${esc(s.name)}</div><div class="d">${esc(s.desc || '')} ${fmtDur(s.dur)}</div></div><span class="p">${money(s.price, { whole: true })}</span></button>`).join('')}</div></div>`).join('') + `<div class="row between" style="position:sticky;bottom:0;background:var(--surface);padding:12px 0;border-top:1px solid var(--line-2)"><div>${b.serviceIds.length ? `<b>${b.serviceIds.length} selected</b> · ${fmtDur(bkDur())} · ${money(bkPrice(), { whole: true })}` : '<span class="muted">Pick one or more services</span>'}</div><button class="btn primary lg" data-act="bk-step" data-s="1" ${b.serviceIds.length ? '' : 'disabled'}>Choose ${esc(tpl().noun.pro)}</button></div>`;
     } else if (step === 1) {
-      body = `<div class="staff-pick"><button class="staff-card ${b.staffId === 'any' ? 'on' : ''}" data-act="bk-staff" data-id="any"><div class="avatar lg" style="background:var(--surface-3);color:var(--ink-2)">${I.spark}</div><div class="strong">First available</div><div class="role">Most open times</div></button>${bookableStaff().map((s) => `<button class="staff-card ${b.staffId === s.id ? 'on' : ''}" data-act="bk-staff" data-id="${s.id}"><div class="avatar lg" style="background:${s.color}">${initials(s.name)}</div><div class="strong">${esc(s.name.split(' ')[0])}</div><div class="role">${esc(s.role)}</div><div class="tiny faint">${esc(s.bio)}</div></button>`).join('')}</div><div class="row between" style="margin-top:16px"><button class="btn" data-act="bk-step" data-s="0">${I.left}Back</button><button class="btn primary lg" data-act="bk-step" data-s="2">Pick a time</button></div>`;
+      body = `<div class="staff-pick"><button class="staff-card ${b.staffId === 'any' ? 'on' : ''}" data-act="bk-staff" data-id="any"><div class="avatar lg" style="background:var(--surface-3);color:var(--ink-2)">${I.spark}</div><div class="strong">First available</div><div class="role">Most open times</div></button>${bkStaff().map((s) => `<button class="staff-card ${b.staffId === s.id ? 'on' : ''}" data-act="bk-staff" data-id="${s.id}"><div class="avatar lg" style="background:${s.color}">${initials(s.name)}</div><div class="strong">${esc(s.name.split(' ')[0])}</div><div class="role">${esc(s.role)}</div><div class="tiny faint">${esc(s.bio)}</div></button>`).join('')}</div><div class="row between" style="margin-top:16px"><button class="btn" data-act="bk-step" data-s="0">${I.left}Back</button><button class="btn primary lg" data-act="bk-step" data-s="2">Pick a time</button></div>`;
     } else if (step === 2) {
       const days = Array.from({ length: 14 }, (_, i) => addDays(todayStr(), i));
       if (!b.date) b.date = days.find((d) => bkSlotsFor(d).length) || days[0];
@@ -57,7 +60,7 @@ Object.assign(Actions, {
   'bk-confirm': () => {
     const b = bk(); const phone = b.phone.replace(/\D/g, ''); let c = st().clients.find((x) => x.phone === phone);
     if (!c) { const parts = b.name.trim().split(/\s+/); c = upsertClient({ first: parts[0], last: parts.slice(1).join(' '), phone, email: b.email.trim(), source: 'Website' }); }
-    const staffId = b.resolvedStaff || (b.staffId === 'any' ? bookableStaff()[0].id : b.staffId);
+    const staffId = b.resolvedStaff || (b.staffId === 'any' ? (bkStaff()[0] || bookableStaff()[0]).id : b.staffId);
     const items = b.serviceIds.map((id) => { const s = svcById(id); return { serviceId: id, price: s.price, dur: s.dur }; });
     if (conflicts(staffId, b.date, b.start, sum(items, (i) => i.dur)).length) { toast('That time was just taken — pick another', 'bad'); S.ui.bookingStep = 2; b.start = null; rerenderContent(); return; }
     const a = createAppointment({ clientId: c.id, staffId, date: b.date, start: b.start, items, notes: b.note, source: 'online', status: 'booked' });

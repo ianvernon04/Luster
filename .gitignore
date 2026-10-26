@@ -1,5 +1,6 @@
-node_modules/
-package.json
-package-lock.json
-src/test/shots/
+node_modules
+.DS_Store
+src/index.html
 src/test/page.html
+src/test/shots/
+supabase/test/shots/

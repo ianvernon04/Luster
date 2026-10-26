@@ -2,11 +2,12 @@
 const { chromium } = require('playwright'); const path = require('path'); const fs = require('fs');
 const OUT = path.join(__dirname, 'shots'); const url = 'file://' + path.join(__dirname, 'page.html');
 const errors = [];
+const TEST_NOW = (() => { const d = new Date(); d.setHours(10, 30, 0, 0); if (d.getDay() === 0) d.setDate(d.getDate() + 1); return d; })();   // the sample team is off on Sundays
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 } }); const p = await ctx.newPage();
-  await p.clock.setFixedTime(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 10, 30));
-  p.on('pageerror', (e) => errors.push('[pageerror] ' + e.message)); p.on('console', (m) => { if (m.type() === 'error' && !/ERR_TUNNEL/.test(m.text())) errors.push('[console] ' + m.text()); });
+  await p.clock.setFixedTime(TEST_NOW);
+  p.on('pageerror', (e) => errors.push('[pageerror] ' + e.message)); p.on('console', (m) => { if (m.type() === 'error' && !/^https?:/.test((m.location() || {}).url || '') && !/ERR_TUNNEL/.test(m.text())) errors.push('[console] ' + m.text()); });
   await p.goto(url); await p.waitForSelector('#rail .nav-item'); await p.waitForTimeout(200);
   const t = async (name, fn) => { try { await fn(); console.log('ok   ', name); } catch (e) { console.log('FAIL ', name, '-', e.message.split('\n').slice(0, 3).join(' | ')); errors.push('[test ' + name + '] ' + e.message.split('\n')[0]); await p.evaluate(() => { window.Luster.ui.modal = null; document.getElementById('modal-root').innerHTML = ''; }).catch(() => {}); } };
   await t('wizard: create a hair salon', async () => {

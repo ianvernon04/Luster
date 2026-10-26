@@ -22,11 +22,13 @@ BUILT=$(date -u +%Y-%m-%dT%H:%MZ)
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Luster">
-<meta name="description" content="Front-desk software for salons, spas and studios. Demo build.">
+<meta name="description" content="Front-desk software for salons, spas and studios.">
 <meta name="luster-build" content="$HASH $BUILT">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<script src="config.js"></script>
+<script src="vendor/supabase-2.45.4.js"></script>
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -43,19 +45,25 @@ HTML
 cat > "$OUT/sw.js" <<SW
 /* Luster service worker — build $HASH ($BUILT) */
 const CACHE = 'luster-$HASH';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png'];
+const ASSETS = ['./', './index.html', './config.js', './vendor/supabase-2.45.4.js', './vendor/qrcode-1.4.4.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const req = e.request; if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return; // fonts etc. go straight to the network
-  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) {
-    // network first so a new deploy shows up on the next launch; cached copy when offline
-    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return res; }).catch(() => caches.match('./index.html')));
+  if (url.origin !== location.origin) return;                        // Supabase, fonts: straight to the network
+  const rel = url.pathname.slice(new URL(self.registration.scope).pathname.length);
+  if (/^(book|supabase|src)\//.test(rel) || rel === '404.html') return;  // the public booking page is never served from this cache
+  const shell = rel === '' || rel === 'index.html';
+  if (req.mode === 'navigate' && !shell) return;                     // other pages on the site (privacy, terms): network as usual
+  const fresh = shell || rel === 'config.js';
+  if (fresh) {
+    // network first, so a new deploy (or new settings) shows up on the next launch; cached copy when offline
+    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); if (res.ok) caches.open(CACHE).then((c) => c.put(rel === 'config.js' ? './config.js' : './index.html', copy)); return res; })
+      .catch(() => caches.match(rel === 'config.js' ? './config.js' : './index.html')));
     return;
   }
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return res; })));
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { const copy = res.clone(); if (res.ok) caches.open(CACHE).then((c) => c.put(req, copy)); return res; })));
 });
 SW
 echo "built $OUT/index.html ($(wc -c < "$OUT/index.html") bytes) — build $HASH"

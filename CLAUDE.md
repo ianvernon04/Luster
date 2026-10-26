@@ -1,46 +1,77 @@
 # Luster — notes for Claude Code sessions
 
-Single-file, local-first web app (vanilla JS, no framework, no build tooling beyond bash). The repo root is
-deployed as-is by GitHub Pages, so **the built `index.html` and `sw.js` at the root are committed**.
+Front-desk software for salons, spas and studios. Local-first web app (vanilla JS, no framework, no bundler) plus a
+Supabase backend for live businesses. The repo root is served as-is by GitHub Pages at https://www.nwluster.com, so
+**the built `index.html` and `sw.js` at the root are committed**.
 
 ## Commands
 
-- Build the artifact fragment + standalone test page: `cd src && ./build.sh`
-- Build the deployable PWA into the repo root: `./src/build-pwa.sh` (runs build.sh first)
-- Tests (Playwright, headless Chromium): `cd src && ./build-pwa.sh && node test/run.js && node test/ws.js && node test/setup.js && node test/pwa.js`
-  - `run.js`/`ws.js` walk the UI; `setup.js` covers personalized setup links; `pwa.js` serves the root under `/luster/` and checks manifest, service worker, offline reload and the install hint
-  - First time: `npm i playwright@1.63.0 && npx playwright install chromium`
-  - Tests fix the clock at 10:30 local; checkout/refund tests need a day the seeded staff work (Mon–Sat).
+- Build the deployable app into the repo root: `./src/build-pwa.sh` (also rebuilds `src/index.html`, the claude.ai artifact fragment)
+- Test everything (Playwright + PGlite; first time: `npm i --no-save playwright@1.49.1 @electric-sql/pglite@0.2.17 && npx playwright install chromium`):
+  ```
+  ./src/build-pwa.sh
+  node supabase/test/db.test.mjs          # database rules: double-booking, studio isolation, health-file access, rate limits
+  node supabase/test/booking.e2e.mjs      # public booking page in a phone browser set to Japan time
+  node supabase/test/app.e2e.mjs          # go live from the app, book on a phone, it lands on the iPad; conflicts; 2nd device
+  cd src && node test/setup.js && node test/pwa.js && node test/import.js && node test/run.js && node test/ws.js
+  ```
 - Icons: `cd src && node icons.js` renders every PNG at the root from the vector mark in that file (apple-touch-icon must stay opaque).
-- Deploy: `./src/build-pwa.sh && git add -A && git commit -m "…" && git push origin main` → live at https://www.nwluster.com in ~1 min.
-  Always rebuild before committing so root `index.html`/`sw.js` match `src/parts/`.
+- Deploy: push to `main` (Pages publishes in ~1 min). Releases prepared outside the repo arrive through
+  `.github/workflows/luster.yml` (template in `ops/luster.yml`): it polls the `releases` table, applies the newest
+  release, rebuilds, runs every suite above, and pushes only if all pass. `ops/make-release.sh` packs a release.
 
-## Where things live (src/parts/, concatenated in filename order)
+## Layout
 
-- `00-head.html` title/fonts · `10-styles.css` tokens + components · `20-markup.html` shell markup
-- `30-util.js` dates, money, ids, `I` icon set (`.ic` class), mulberry32 rng
-- `31-templates.js` `SEED_VERSION`, `FLAGS` (caution flags), `TEMPLATES` (7 verticals: services, staff
-  roles, intake sections, consents, `contra` rules, copy), `intakeTemplate()`, `consent()`
-- `32-seed.js` deterministic demo data: `catalogFor`, `generateClients`, `generateActivity`,
-  `buildInitialState`, `refreshSeededActivity` (regenerates seeded records daily, keeps user-created ones)
-- `33-store.js` state `S`, workspaces (IndexedDB `luster-db` KV, index in localStorage), `KV`, `PhotoDB`,
-  `contraindications()`, appointments/tickets/refunds/store-credit mutations, `freeSlots`, `nextOpenDay`
-- `40-shell.js` rail, palette, modals (workspaces, new-business wizard), global `Actions`
-- `41-calendar.js` day/week grid (`SLOT_H`), drag-reschedule, appointment drawer, booking draft
-- `42-clients.js` client list + file (tabs incl. Health), ticket/receipt modals
-- `43-checkout.js` checkout, pay methods incl. store credit, refund modal
-- `44-booking.js` client-facing booking · `45-forms.js` intake/consents, `showIf`, `applyIntakeToClient`
-- `46-messages.js` · `47-install.js` setup links (`?biz=hair&name=…&owner=…&team=…` creates/selects the business at boot,
-  per-link data: manifest so the installed app relaunches with the link), install hint · `48-reports.js` (dataviz: 5-slot
-  palette, single axis) · `49-settings.js` · `50-app.js` boot
+- `src/parts/` — the app, concatenated in filename order by `src/build.sh`:
+  `00-head.html` · `10-styles.css` · `20-markup.html` · `30-util.js` (dates incl. `APP_TZ` business time zone, `zonedToUtc`, icons, rng)
+  · `31-templates.js` (`SEED_VERSION`, `FLAGS`, 7 vertical `TEMPLATES`) · `32-seed.js` (demo data) · `33-store.js` (state, workspaces,
+  IndexedDB, mutations; `commit()` triggers cloud sync) · `34-cloud.js` (Supabase sync for live businesses) · `35-diag.js` (errors
+  and sync problems on live iPads → `app_events`, scrubbed of emails/phones) · `40-shell.js` (rail,
+  palette, modals, `Actions`) · `41-calendar.js` · `42-clients.js` · `43-checkout.js` · `44-booking.js` · `45-forms.js` · `46-messages.js`
+  · `46-import.js` (client import from CSV exports: column matching, dedupe, notes/allergies) · `47-cloud-ui.js` (sign in, password
+  reset, go live, booking link, website button kit + QR sign) · `47-handoff.js` (live businesses: texts/emails open in the studio's
+  Messages or Mail and are logged as handed off; confirmation, reminder, receipt and form-link wording) · `47-install.js` (setup
+  links, install hint) · `48-reports.js` · `49-settings.js` (incl. team hours/services, CSV exports) · `50-app.js` (boot; saves and
+  syncs when the app is backgrounded)
+- `book/intake.js` — `showIfMet()` and `deriveIntake()`, concatenated into the app first and loaded by the booking page: the iPad
+  and the client's phone must derive the same caution flags from the same answers.
+- `book/index.html` — the public booking page clients use (`/book/<slug>` via `404.html`, manage link `/book/?t=<token>`, forms
+  `/book/?f=<token>`). Talks to Supabase only through the `booking_*` and `form_public_*` functions.
+- `privacy.html`, `terms.html` — public pages (the service worker never caches them as the app shell).
+- `supabase/migrations/` — the database. `supabase/test/` — PGlite harness that imitates Supabase (`harness.mjs`), a stand-in for
+  Supabase's HTTP API (`server.mjs`: PostgREST tables + RPC, password auth), fixtures, and the suites above.
+- `config.js` — public Supabase URL + anon key (safe to publish; RLS decides what the key can do). `vendor/` — supabase-js UMD build
+  and qrcode-generator, both listed in `vendor/sources.txt`; releases leave them out and `ops/fetch-vendor.sh` puts them back from npm.
+- `ops/` — release tooling and the workflow template.
+
+## How live businesses work (read before touching 33-store.js or 34-cloud.js)
+
+- Demo workspaces are local-only and seeded. A live workspace (`S.state.live`) mirrors one `businesses` row.
+- Template staff/service ids (`s1`, `sv_peel`) stay as local ids so safety rules keep working; the cloud stores them in `key`, and
+  `live.ids` maps key → uuid. Clients and appointments use uuids everywhere (`newId()`).
+- Sync = pull (catalog on full syncs; clients/appointments since `lastPull` minus a 2-minute overlap) then push (every record whose
+  mapped row hash differs from `live.synced[id]`). Edits made while offline simply push later. Realtime triggers a sync; polling is the fallback.
+- The database refuses double-bookings (exclusion constraint). A refused push rolls the iPad back and shows a toast (`Cloud.refused`).
+- Live calendars run on the business time zone (`APP_TZ`), not the device's: the owner may be in Okinawa while the studio is in Baton Rouge.
+- In the cloud: business, team, hours, services, clients (deleted = `deleted_at` via `delete_client`, which also cancels their
+  upcoming visits), appointments, notes (soft-deleted), form templates, forms (each freezes its questions in `definition` and has a
+  `public_token` link), signed answers, health files, tickets, refunds, support events. Health files and signed answers are written
+  by anyone on the team but read only by owners/managers/providers, fetched on demand, and every read is logged. Allergen names
+  ride on the client row (`profile.allergies`): the front desk needs them. Still device-only: photos (next: Supabase Storage),
+  products/stock, memberships, gift card balances, messages, waitlist.
+- Intake on the phone: `booking_create` returns `intake_token` for clients without a completed intake (`intake_link_for`); the
+  phone renders the frozen definition, derives flags with `deriveIntake`, and `form_public_submit` files answers + signature,
+  ADDS caution flags (never removes them) and merges the health file. Devices notice via `health_index(p_business, p_since)`.
+- A live business never simulates: no pretend texts, confirmations, card reader, card on file, membership charges or deposits.
+  Anything that would "send" goes through `outgoing()` in `47-handoff.js`. Keep it that way when adding features.
 
 ## Conventions
 
-- Bump `SEED_VERSION` in `31-templates.js` whenever the seeded state shape changes; old workspaces reseed.
-- Keep everything relative (`./`): the app is served from a subpath (`/luster/`) and from the claude.ai artifact.
-- The artifact version on claude.ai takes `src/index.html` (the fragment, no doctype/head/body) — the host
-  wraps it. The PWA takes the full document from `build-pwa.sh`.
-- Vertical-specific content belongs in `TEMPLATES`, never hard-coded in views; views read `tpl()`.
-- Safety first: anything that touches services vs. client health goes through `contraindications()` and the
-  flag system, surfaced in the appointment drawer, booking draft and Health tab.
-- No external scripts. Google Fonts is the only cross-origin request.
+- Migrations: until the first `apply_migration` to the production project, edit them in place; after that, only add new files.
+- Bump `SEED_VERSION` only for demo-data shape changes; live workspaces are never reseeded (key `luster.live.<id>`).
+- Keep everything relative (`./`): the app runs at the domain root, under `/luster/` in tests, and inside the claude.ai artifact.
+- Vertical-specific content lives in `TEMPLATES`; views read `tpl()`.
+- Safety first: services vs. client health go through `contraindications()` and the flag system. Client matching on the booking page
+  requires the same first name plus phone or email; near-matches get a separate file tagged `possible_duplicate`.
+- Every new table: RLS on, policies by `is_member()` / `has_role()`, and a test in `supabase/test/db.test.mjs`.
+- No third-party scripts at runtime. Google Fonts is the only cross-origin request besides Supabase.

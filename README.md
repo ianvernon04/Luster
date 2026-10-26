@@ -9,15 +9,17 @@ here is what people install.
 
 ## Install it as an app
 
-Open the Pages URL for this repo (Settings → Pages shows it; for `ianvernon04/luster` it is
-`https://ianvernon04.github.io/luster/`) on the device:
+Open https://www.nwluster.com on the device:
 
 - iPhone / iPad (Safari): Share → **Add to Home Screen**. Full-screen, works offline.
 - Android (Chrome): menu → **Install app**.
 - Mac / Windows (Chrome, Edge): the install icon at the right end of the address bar.
 
-Demo build: all data stays on the device (IndexedDB). Nothing is sent anywhere. Payments and texting are
-simulated. Seeded demo data regenerates around today's date; anything you create yourself is kept.
+Demo businesses keep all data on the device (IndexedDB) and send nothing anywhere; seeded demo data regenerates
+around today's date, and its texting and card reader are pretend. Live businesses sync with Supabase (see Online
+booking) and never pretend: until texting and card payments are connected, texts open in the studio phone's Messages
+or Mail ready to send (and are logged as sent from the studio), and card payments are taken on the studio's own
+terminal and recorded in Luster.
 
 ## Personalized install links
 
@@ -30,31 +32,61 @@ https://www.nwluster.com/?biz=hair&name=Magnolia%20Hair%20Studio&owner=Renee&tea
 `biz` is one of `facial`, `hair`, `lash`, `nails`, `massage`, `medspa`, `barber`; `name`, `owner`, `team` (2–6),
 `phone` and `address` are optional. The same link always opens the same business on that device.
 
+## Online booking
+
+A demo becomes a real business from **Settings → Online booking → Put it online**: sign in, pick the booking link,
+and the app creates a live copy with the same team, services and hours (no sample clients). Clients book at
+`https://www.nwluster.com/book/<link>`; the booking lands on the iPad calendar within seconds, and the client gets a
+link to change or cancel. New clients also get a link to the studio's intake form, which they fill in and sign on
+their phone; their answers, caution flags and health file reach every iPad. The database makes double-booking
+impossible, keeps each studio's data walled off, and logs every time someone opens a health file.
+
+Settings → Online booking also has the studio's website kit: a Book button (code to paste, or point an existing
+button at the link), step-by-step for Wix, Squarespace, WordPress, Instagram, Google and Facebook, and a QR code sign
+to print for the counter.
+
+### Supabase settings to check once (dashboard → Authentication)
+
+- **URL Configuration**: Site URL `https://www.nwluster.com`; add `https://www.nwluster.com/**` to Redirect URLs.
+  Password-reset and confirmation links come back to the app through these.
+- **Emails**: Supabase's built-in sender only delivers to members of the Supabase organization. Before studios sign up,
+  connect a real sender under SMTP Settings (Google Workspace or Resend), or new owners never get their confirmation
+  and reset emails.
+
 ## Update the live app
 
-1. Make the change in `src/parts/`.
+1. Make the change in `src/parts/` (or `book/`, `supabase/`).
 2. Run `./src/build-pwa.sh` — rebuilds `index.html` and `sw.js` at the root with a new cache version.
-3. Commit and push to `main`. Pages redeploys in about a minute. Installed copies pick the new
-   version up the next time they open with a connection.
+3. Run the tests (see below), then commit and push to `main`. Pages redeploys in about a minute.
+   Installed copies pick the new version up the next time they open with a connection.
 
-No build step runs on GitHub: what is committed at the root is what gets served.
+Releases can also arrive without anyone touching the repo: the `Luster` GitHub workflow checks for a waiting release
+every 10 minutes, applies it, rebuilds, runs every test, and pushes only if they all pass.
 
 ## Layout
 
 ```
 index.html, sw.js            built app (generated — do not edit by hand)
 manifest.webmanifest, *.png  static PWA assets
-src/parts/                   the source, concatenated in filename order
-src/build.sh                 parts → src/index.html (fragment) + src/test/page.html (standalone page)
-src/build-pwa.sh             full installable build → repo root
+privacy.html, terms.html     the public privacy policy and terms
+config.js                    public Supabase URL + key for the app and the booking page
+book/index.html              the public booking page (pretty links via 404.html), manage links (?t=) and forms (?f=)
+book/intake.js               intake rules shared by the app and the client's phone (caution flags, health summary)
+src/parts/                   the app source, concatenated in filename order
+src/build.sh, build-pwa.sh   build the artifact fragment / the installable app at the root
 src/icons.js                 renders the icon PNGs from one vector mark
-src/test/                    Playwright tests: run.js, ws.js (UI), setup.js (links), pwa.js (install build)
+src/test/                    Playwright tests: run.js, ws.js (UI), setup.js (links), pwa.js (install), import.js (CSV)
+supabase/migrations/         the database: tables, row-level security, booking functions
+supabase/test/               database + end-to-end tests against an in-process Postgres
+vendor/                      supabase-js and the QR code generator, served from our own domain (sources.txt)
+ops/                         release packing, vendor fetching, the GitHub workflow template
 ```
 
 ## Run the tests
 
 ```
-cd src && ./build.sh
-npm i playwright@1.63.0 && npx playwright install chromium
-node test/run.js && node test/ws.js && node test/setup.js && node test/pwa.js
+npm i --no-save playwright@1.49.1 @electric-sql/pglite@0.2.17 && npx playwright install chromium
+./src/build-pwa.sh
+node supabase/test/db.test.mjs && node supabase/test/booking.e2e.mjs && node supabase/test/app.e2e.mjs
+cd src && node test/setup.js && node test/pwa.js && node test/import.js && node test/run.js && node test/ws.js
 ```

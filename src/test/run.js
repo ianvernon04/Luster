@@ -5,12 +5,13 @@ const fs = require('fs');
 const OUT = path.join(__dirname, 'shots'); fs.mkdirSync(OUT, { recursive: true });
 const url = 'file://' + path.join(__dirname, 'page.html');
 const errors = [];
+const TEST_NOW = (() => { const d = new Date(); d.setHours(10, 30, 0, 0); if (d.getDay() === 0) d.setDate(d.getDate() + 1); return d; })();   // the sample team is off on Sundays
 const lastToast = async (p) => { const ts = await p.$$('.toast'); return ts.length ? (await ts[ts.length - 1].textContent()) : ''; };
 async function page(browser, opts = {}) {
   const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1366, height: 860 }, colorScheme: opts.dark ? 'dark' : 'light', deviceScaleFactor: 1, hasTouch: !!opts.touch });
   const p = await ctx.newPage();
-  await p.clock.setFixedTime(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 10, 30));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(`[console] ${m.text()}`); });
+  await p.clock.setFixedTime(TEST_NOW);
+  p.on('console', (m) => { if (m.type() === 'error' && !/^https?:/.test((m.location() || {}).url || '') && !/ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|fonts\.g/.test(m.text())) errors.push(`[console] ${m.text()}`); });   // web fonts may be unreachable in sandboxes
   p.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));
   await p.goto(url); await p.waitForSelector('#rail .nav-item', { state: 'attached', timeout: 15000 }); await p.waitForTimeout(200);
   return { ctx, p };
@@ -114,6 +115,38 @@ async function page(browser, opts = {}) {
   await t('reports', async () => { await p.click('[data-act="go"][data-view="reports"]'); await p.waitForSelector('[data-chart="revenue"] svg'); for (const r of ['today', '7d', '90d', '30d']) { await p.click(`[data-act="report-range"][data-id="${r}"]`); await p.waitForTimeout(80); } });
   await p.screenshot({ path: `${OUT}/11-reports.png`, fullPage: false });
   await t('settings tabs', async () => { await p.click('[data-act="go"][data-view="settings"]'); for (const tab of ['staff', 'services', 'products', 'booking', 'data', 'business']) { await p.click(`[data-act="settings-tab"][data-id="${tab}"]`); await p.waitForTimeout(40); } });
+  await t('team hours and services: dropdowns and checkboxes save, bad ranges refused', async () => {
+    await p.click('[data-act="settings-tab"][data-id="staff"]'); await p.waitForTimeout(60);
+    const s = await p.evaluate(() => { const x = window.Luster.state.staff.find((y) => y.bookable && y.days[2]); return { id: x.id, h: x.days[2].slice() }; });
+    await p.click(`details[data-more="${s.id}:hours"] summary`); await p.click(`details[data-more="${s.id}:svc"] summary`); await p.waitForTimeout(40);
+    await p.selectOption(`select[data-on-change="staff-hours"][data-id="${s.id}"][data-d="2"][data-end="1"]`, '1080'); await p.waitForTimeout(60);
+    let h = await p.evaluate((id) => window.Luster.state.staff.find((y) => y.id === id).days[2], s.id); if (h[1] !== 1080 || h[0] !== s.h[0]) throw new Error('end time not saved: ' + JSON.stringify(h));
+    await p.selectOption(`select[data-on-change="staff-hours"][data-id="${s.id}"][data-d="2"][data-end="0"]`, '1200'); await p.waitForTimeout(60);
+    h = await p.evaluate((id) => window.Luster.state.staff.find((y) => y.id === id).days[2], s.id); if (h[0] !== s.h[0]) throw new Error('start after end was accepted');
+    if (!/after the start/.test(await lastToast(p))) throw new Error('no warning for a start after the end');
+    const end = await p.$eval(`select[data-on-change="staff-hours"][data-id="${s.id}"][data-d="2"][data-end="1"] option[value="1440"]`, (o) => o.textContent); if (end !== 'midnight') throw new Error('midnight label: ' + end);
+    await p.evaluate(() => rerenderContent()); if (!(await p.$eval(`details[data-more="${s.id}:svc"]`, (d) => d.open))) throw new Error('Services panel closed itself on a re-render');
+    const box = `input[data-on-change="staff-skill"][data-id="${s.id}"]`; const svc = await p.$eval(box, (i) => i.dataset.svc);
+    await p.uncheck(`${box}[data-svc="${svc}"]`); await p.waitForTimeout(60);
+    let sk = await p.evaluate((id) => window.Luster.state.staff.find((y) => y.id === id).skills, s.id); if (!sk || sk.includes(svc)) throw new Error('service not removed: ' + JSON.stringify(sk));
+    await p.check(`${box}[data-svc="${svc}"]`); await p.waitForTimeout(60);
+    sk = await p.evaluate((id) => window.Luster.state.staff.find((y) => y.id === id).skills, s.id); if (sk !== undefined && sk !== null) throw new Error('re-checking every service should mean "does everything": ' + JSON.stringify(sk));
+    await p.screenshot({ path: `${OUT}/25-team-settings.png` });
+  });
+  await t('exports: clients and appointments as spreadsheets, everything as a backup file', async () => {
+    await p.click('[data-act="settings-tab"][data-id="data"]'); await p.waitForSelector('[data-act="export-csv"][data-k="clients"]');
+    const n = await p.evaluate(() => ({ c: window.Luster.state.clients.length, a: window.Luster.state.appointments.length }));
+    const grab = async (sel) => { const [dl] = await Promise.all([p.waitForEvent('download'), p.click(sel)]); return { name: dl.suggestedFilename(), text: require('fs').readFileSync(await dl.path(), 'utf8') }; };
+    const cl = await grab('[data-act="export-csv"][data-k="clients"]'); const rows = cl.text.replace(/^\ufeff/, '').split('\r\n');
+    if (!/-clients-\d{4}-\d{2}-\d{2}\.csv$/.test(cl.name) || !/^First Name,Last Name,Phone,Email/.test(rows[0]) || rows.length !== n.c + 1) throw new Error(`clients export: ${cl.name} ${rows.length} rows vs ${n.c}`);
+    const ap = await grab('[data-act="export-csv"][data-k="appointments"]'); if (ap.text.replace(/^\ufeff/, '').split('\r\n').length !== n.a + 1) throw new Error('appointments export row count');
+    const bk = await grab('[data-act="export-json"]'); const j = JSON.parse(bk.text); if (j.clients.length !== n.c) throw new Error('backup incomplete');
+    // a name that looks like a formula comes out as text
+    const orig = await p.evaluate(() => window.Luster.state.clients[0].first);
+    await p.evaluate(() => { window.Luster.state.clients[0].first = '=HYPERLINK("http://x")'; });
+    const cl2 = await grab('[data-act="export-csv"][data-k="clients"]'); if (!cl2.text.includes(`"'=HYPERLINK(""http://x"")"`)) throw new Error('formula not neutralised');
+    await p.evaluate((o) => { window.Luster.state.clients[0].first = o; }, orig);
+  });
   await t('persistence across reload', async () => { await p.evaluate(() => window.Luster.save()); await p.waitForTimeout(300); await p.reload(); await p.waitForTimeout(400); const has = await p.evaluate(() => window.Luster.state.clients.some((c) => c.first === 'Smoke')); if (!has) throw new Error('state did not persist'); });
   await t('render speed', async () => { const ms = await p.evaluate(() => { const t = performance.now(); window.Luster.go('clients'); window.Luster.go('calendar'); return performance.now() - t; }); console.log('      two view renders:', ms.toFixed(1), 'ms'); if (ms > 400) throw new Error('slow render ' + ms); });
 
