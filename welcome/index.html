@@ -523,10 +523,12 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
   var f = document.getElementById('rq'), err = document.getElementById('rq-err'), btn = document.getElementById('rq-send');
   var say = function (msg) { err.innerHTML = msg; err.classList.toggle('on', !!msg); };
   var fallback = 'Or email <a href="mailto:ixv@nwluster.com?subject=Demo%20request">ixv@nwluster.com</a>.';
+  // where the visitor came from (an Instagram bio adds utm_source=ig...), filed with the request; click ids and the rest are left out
+  var from = (function () { var keep = []; location.search.slice(1).split('&').forEach(function (kv) { var k = kv.split('=')[0]; if (k.indexOf('utm_') === 0 || k === 'ref') keep.push(kv); }); return keep.length ? '?' + keep.join('&') : ''; })();
   f.addEventListener('submit', function (e) {
     e.preventDefault(); say('');
     var v = function (n) { var el = f.elements[n]; return el ? String(el.value || '').trim() : ''; };
-    var data = { name: v('name'), studio: v('studio'), email: v('email'), phone: v('phone'), kind: v('kind'), software: v('software'), best_time: v('best_time'), message: v('message'), founding: f.elements.founding.checked, website: v('website'), page: location.pathname };
+    var data = { name: v('name'), studio: v('studio'), email: v('email'), phone: v('phone'), kind: v('kind'), software: v('software'), best_time: v('best_time'), message: v('message'), founding: f.elements.founding.checked, website: v('website'), page: location.pathname + from };
     if (!data.name) { say('Please add your name.'); f.elements.name.focus(); return; }
     var digits = data.phone.replace(/\D/g, '');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email) && digits.length < 10) { say('Please add an email or a mobile number so we can reach you.'); (data.email ? f.elements.email : f.elements.phone).focus(); return; }

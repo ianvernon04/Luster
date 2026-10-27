@@ -41,9 +41,12 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
   `/book/?f=<token>`). Talks to Supabase only through the `booking_*` and `form_public_*` functions.
 - `privacy.html`, `terms.html` — public pages (the service worker never caches them as the app shell).
 - `welcome/` — the website. A first visit to the root from a plain link lands there: the root `index.html` (its head, written by
-  `build-pwa.sh`) redirects when there's no query string or hash, the app isn't installed, and the device has never opened the app
-  (`luster.ws.index`). Setup/pitch links, `?demo` (the website's "Try it yourself"), `?signin` (opens sign-in; `50-app.js`), email
-  links and installed iPads go straight to the app. "Request a demo" posts to `request_demo()`; requests land in `demo_requests`,
+  `build-pwa.sh`) redirects unless the link carries one of the app's own parameters (the list in that script: `demo`, `signin`,
+  `studio`, `biz`, auth ones) or a hash, the app is installed, or the device has opened the app before (`luster.ws.index`).
+  Tracking tags never count (Instagram turns a bio link into `?utm_source=ig&...&fbclid=...`): `utm_*` and `ref` ride along to
+  the website and are filed with a demo request (`page`), the rest are dropped. A new root URL parameter goes on that list.
+  Setup/pitch links, `?demo` (the website's "Try it yourself"), `?signin` (opens sign-in; `50-app.js`), email links and
+  installed iPads go straight to the app. "Request a demo" posts to `request_demo()`; requests land in `demo_requests`,
   which only the Supabase dashboard can read. Its app pictures are screenshots of the real app: `node ops/site-shots.mjs`, then
   `python3 ops/site-images.py`, then `node ops/site-og.mjs` (link preview). Its photographs are free Unsplash photos of studios
   (sources in `welcome/img/credits.txt`) plus Ian's own, cropped by `ops/site-photos.py` (which drops photo metadata such as GPS).

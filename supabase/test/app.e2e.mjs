@@ -339,9 +339,10 @@ await t('website kit: button code with the booking link, a QR code, a printable 
   if (process.env.LUSTER_KEEP_QR) fs.copyFileSync(await dl.path(), process.env.LUSTER_KEEP_QR);
   await pad.waitForTimeout(150); await pad.screenshot({ path: `${shots}/a9-website-kit.png` });
 });
-await t('the website: a first visit lands on it, a demo request reaches Luster, Sign in opens the studio, the demo links back', async () => {
+await t('the website: a first visit from an Instagram bio lands on it, a demo request reaches Luster with where it came from, Sign in opens the studio, the demo links back', async () => {
   const { c, p } = await ctx(phone);
-  await p.goto(base); await p.waitForURL(/\/welcome\/$/); await p.waitForSelector('#rq');
+  await p.goto(base + '?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAAabc');   // what Instagram makes of nwluster.com
+  await p.waitForURL(/\/welcome\/\?utm_source=ig&utm_medium=social&utm_content=link_in_bio$/); await p.waitForSelector('#rq');
   ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'the website scrolls sideways on a phone');
   await p.click('#rq button[type="submit"]'); await p.waitForSelector('#rq-err.on'); ok(/your name/.test(await p.textContent('#rq-err')), 'an empty request went through');
   await p.fill('#rq-name', 'Kelsey Test'); await p.click('#rq button[type="submit"]'); ok(/email or a mobile/.test(await p.textContent('#rq-err')), 'a request with no way to reach them went through');
@@ -350,7 +351,7 @@ await t('the website: a first visit lands on it, a demo request reaches Luster, 
   await p.click('#rq button[type="submit"]'); await p.waitForSelector('#rq-thanks.on');
   ok(/Thank you, Kelsey!/.test(await p.textContent('#rq-thanks')), 'no thank-you');
   const row = (await as(db, 'postgres', `select name, studio, phone, kind, software, founding, status, page from demo_requests where name = 'Kelsey Test'`)).rows[0];
-  ok(row && row.phone === '2255550177' && row.founding === true && row.status === 'new' && row.kind === 'Med spa' && row.page === '/welcome/', JSON.stringify(row));
+  ok(row && row.phone === '2255550177' && row.founding === true && row.status === 'new' && row.kind === 'Med spa' && row.page === '/welcome/?utm_source=ig&utm_medium=social&utm_content=link_in_bio', JSON.stringify(row));
   await p.screenshot({ path: `${shots}/a12-website-request.png` });
   await p.goto(base + 'welcome/'); await p.click('footer a[href="../?signin"]'); await p.waitForSelector('#ca-email');
   ok(!/signin/.test(p.url()), 'the sign-in flag stayed in the address'); await c.close();

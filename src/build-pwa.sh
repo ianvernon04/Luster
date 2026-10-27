@@ -18,8 +18,17 @@ BUILT=$(date -u +%Y-%m-%dT%H:%MZ)
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>
 // A first visit from a plain link (an Instagram bio, a typed address) sees what Luster is first. Setup and pitch links
-// (?biz=, ?studio=, ?demo), sign-in links (#...), the installed app, and anyone who has opened the app here before go straight in.
-(function () { try { if (location.search || location.hash || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone || localStorage.getItem('luster.ws.index')) return; location.replace('welcome/'); } catch (e) {} })();
+// (?biz=, ?studio=, ?demo, ?signin), sign-in links (#...), the installed app, and anyone who has opened the app here before
+// go straight in. The tags Instagram, Facebook and mail apps add to links (utm_..., fbclid, ...) are not app links: the utm_
+// tags and ref ride along to the website, which files them with a demo request; the rest are dropped.
+// (No dollar signs or backticks in here: this is an unquoted heredoc.)
+(function () { try {
+  var app = ' demo signin studio biz code token_hash type error error_code error_description access_token ', keep = [], site = true;
+  location.search.slice(1).split('&').forEach(function (kv) { if (!kv) return; var k = decodeURIComponent(kv.split('=')[0].replace(/\+/g, ' '));
+    if (app.indexOf(' ' + k + ' ') >= 0) site = false; else if (k.indexOf('utm_') === 0 || k === 'ref') keep.push(kv); });
+  if (!site || location.hash || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone || localStorage.getItem('luster.ws.index')) return;
+  location.replace('welcome/' + (keep.length ? '?' + keep.join('&') : ''));
+} catch (e) {} })();
 </script>
 <meta name="theme-color" content="#1E5C68" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111516" media="(prefers-color-scheme: dark)">

@@ -22,6 +22,17 @@ const eq = (a, b, what) => { if (a !== b) throw new Error(`${what}: got ${JSON.s
   const c0 = await browser.newContext({ viewport: { width: 1280, height: 800 } }); const w = await c0.newPage(); w.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
   await w.goto(base, { waitUntil: 'load' });
   await t('a first visit from a plain link lands on the website', async () => { await w.waitForURL(base + 'welcome/'); if (!/reads the intake form/.test(await w.textContent('h1'))) throw new Error('no headline'); });
+  await t('a link from an Instagram bio or Facebook (tracking tags and all) lands on the website too; app links still open the app', async () => {
+    const c = await browser.newContext(); const q = await c.newPage(); q.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
+    await q.goto(base + '?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAAabc', { waitUntil: 'load' });
+    await q.waitForURL(base + 'welcome/?utm_source=ig&utm_medium=social&utm_content=link_in_bio');   // the utm tags ride along, the click id doesn't
+    await q.goto(base + '?fbclid=IwAR0abc123', { waitUntil: 'load' }); await q.waitForURL(base + 'welcome/'); await c.close();
+    for (const link of ['?demo', '?signin', '?studio=simplyfacials', '?biz=hair&name=Test%20Salon&utm_source=ig']) {
+      const c2 = await browser.newContext(); const r = await c2.newPage(); r.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
+      await r.goto(base + link, { waitUntil: 'load' }); await r.waitForSelector('#rail .nav-item', { state: 'attached', timeout: 15000 });
+      eq(new URL(r.url()).pathname, '/luster/', link); await c2.close();
+    }
+  });
   await t('the website\'s pictures load and its link preview is set', async () => {
     const broken = await w.evaluate(async () => { const imgs = [...document.images]; imgs.forEach((i) => { i.loading = 'eager'; }); await new Promise((r) => setTimeout(r, 1000)); return imgs.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.src); });
     eq(broken.length, 0, 'broken images ' + broken.join(', ')); if (!/\/welcome\/og\.jpg$/.test(await w.getAttribute('meta[property="og:image"]', 'content'))) throw new Error('og:image');

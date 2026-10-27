@@ -1,4 +1,4 @@
-/* Luster service worker — build 32033e2659 (2026-10-27T09:35Z) */
+/* Luster service worker — build 32033e2659 (2026-10-27T09:57Z) */
 const CACHE = 'luster-32033e2659';
 const ASSETS = ['./', './index.html', './config.js', './vendor/supabase-2.45.4.js', './vendor/qrcode-1.4.4.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
