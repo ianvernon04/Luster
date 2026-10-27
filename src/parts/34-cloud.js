@@ -3,9 +3,10 @@
    - the iPad keeps a full local copy, so the calendar is instant and works offline;
    - local edits are pushed by diffing each record against what the cloud last confirmed (no edit can be missed);
    - cloud changes (online bookings, other devices) arrive by realtime, with a polling fallback;
-   - the database refuses double-bookings, and a refused edit is rolled back on screen with an explanation.
-   In the cloud for now: business, team, hours, services, clients (contact, profile, caution flags), appointments.
-   Still on this device only: health answers, notes, photos, forms, tickets — the next release moves them. */
+   - the database refuses double-bookings and overspent gift cards, and a refused edit is rolled back on screen with an explanation.
+   In the cloud: business, team, hours, services, clients, appointments, notes, forms (answers and health files through
+   audited functions), tickets, refunds, gift cards and their ledger. Still on this device only: photos, products and
+   stock, memberships, messages, waitlist. */
 const CLOUD_CFG = window.LUSTER_CONFIG || {};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
@@ -149,12 +150,32 @@ const Cloud = {
     return { ...(ex || {}), ...(r.data || {}), id: r.id, ticketId: r.ticket_id, clientId: r.client_id, staffId: r.staff_id ? this.keyOf('staff', r.staff_id) : ((ex && ex.staffId) || null),
       date: ymd(r.refunded_on), amount: r.amount_cents / 100, method: r.method, reason: r.reason, seeded: false };
   },
+  // a gift card is sent once; what it holds is worked out by the database from the ledger (never sent from here)
+  giftRow(g) {
+    return { id: g.id, business_id: this.L().businessId, code: g.code, amount_cents: Math.round((g.amount || 0) * 100), client_id: isUuid(g.clientId) ? g.clientId : null,
+      ticket_id: this.syncedRef('ticket', g.ticketId), issued_on: g.date || todayStr(), data: { recipient: g.recipient || null, note: g.note || null } };
+  },
+  giftFromRow(r, ex) {
+    return { ...(ex || {}), id: r.id, code: r.code, amount: r.amount_cents / 100, cloudBalance: r.balance_cents / 100, clientId: r.client_id || (ex && ex.clientId) || null,
+      ticketId: r.ticket_id || (ex && ex.ticketId) || null, date: ymd(r.issued_on), recipient: (r.data && r.data.recipient) || '', note: (r.data && r.data.note) || '', seeded: false };
+  },
+  giftUseRow(u) {
+    return { id: u.id, business_id: this.L().businessId, card_id: u.cardId, ticket_id: this.syncedRef('ticket', u.ticketId), kind: u.kind,
+      amount_cents: Math.round((u.amount || 0) * 100), used_on: u.date || todayStr(), data: { at: u.at || null } };
+  },
+  giftUseFromRow(r, ex) {
+    return { ...(ex || {}), id: r.id, cardId: r.card_id, ticketId: r.ticket_id || (ex && ex.ticketId) || null, kind: r.kind, amount: r.amount_cents / 100,
+      date: ymd(r.used_on), at: (r.data && r.data.at) || r.created_at, seeded: false };
+  },
   // what syncs, in dependency order (a row is pushed only after what it points at)
   kinds() {
     return [
       { kind: 'client', table: 'clients', list: () => st().clients, row: (x) => this.clientRow(x), from: (r, ex) => this.clientFromRow(r, ex) },
       { kind: 'appt', table: 'appointments', list: () => st().appointments.filter((a) => this.uuidOf('staff', a.staffId)), all: () => st().appointments, row: (x) => this.apptRow(x), from: (r, ex) => this.apptFromRow(r, ex) },
       { kind: 'ticket', table: 'tickets', list: () => st().tickets, row: (x) => this.ticketRow(x), from: (r, ex) => this.ticketFromRow(r, ex) },
+      { kind: 'gift', table: 'gift_cards', list: () => st().giftCards, row: (x) => this.giftRow(x), from: (r, ex) => this.giftFromRow(r, ex) },
+      // a use goes up after its card, and after the sale it belongs to (the ledger can't be corrected later)
+      { kind: 'giftUse', table: 'gift_card_uses', list: () => st().giftUses.filter((u) => this.L().synced.gift[u.cardId] && (!u.ticketId || this.L().synced.ticket[u.ticketId])), all: () => st().giftUses, row: (x) => this.giftUseRow(x), from: (r, ex) => this.giftUseFromRow(r, ex) },
       { kind: 'refund', table: 'refunds', list: () => st().refunds.filter((x) => this.L().synced.ticket[x.ticketId]), all: () => st().refunds, row: (x) => this.refundRow(x), from: (r, ex) => this.refundFromRow(r, ex) },
       { kind: 'note', table: 'notes', list: () => st().notes.filter((n) => this.L().synced.client[n.clientId]), all: () => st().notes, row: (x) => this.noteRow(x), from: (r, ex) => this.noteFromRow(r, ex) },
       { kind: 'form', table: 'forms', list: () => st().forms.filter((f) => this.L().synced.client[f.clientId]), all: () => st().forms, row: (x) => this.formRow(x), from: (r, ex) => this.formFromRow(r, ex) },
@@ -267,7 +288,7 @@ const Cloud = {
   err(error) { const e = new Error(error.message || 'Cloud error'); e.code = error.code; if (error.code === '42501' || error.code === 'PGRST301' || /JWT/i.test(error.message || '')) e.auth = true; return e; },
   async pull(full) {
     const sb = this.sb(); const L = this.L(); const biz = L.businessId;
-    for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
+    for (const k of ['client', 'appt', 'ticket', 'gift', 'giftUse', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
     if (full) { await this.pullCatalog(); await this.pullForms(); }
     const since = full ? null : L.lastPull;
     const overlap = (t) => new Date(Date.parse(t) - 120000).toISOString();   // rows can commit slightly out of timestamp order; re-reading two minutes is cheap and merges are idempotent
@@ -305,7 +326,7 @@ const Cloud = {
     if (k.kind === 'appt' && (!r.services || !r.services.length)) ensureBlockService();
     const next = k.from(r, local);
     if (local) Object.assign(local, next);
-    else ({ client: st().clients, appt: st().appointments, ticket: st().tickets, refund: st().refunds, note: st().notes, form: st().forms })[k.kind].push(next);
+    else ({ client: st().clients, appt: st().appointments, ticket: st().tickets, gift: st().giftCards, giftUse: st().giftUses, refund: st().refunds, note: st().notes, form: st().forms })[k.kind].push(next);
     map[r.id] = hashOf(k.row(local || next));
   },
   async pullCatalog() {
@@ -358,7 +379,7 @@ const Cloud = {
         L.catalogHash = hashOf([this.catalogPayload(), this.bizRow()]);
       }
     }
-    for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
+    for (const k of ['client', 'appt', 'ticket', 'gift', 'giftUse', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
     const ft = this.formTemplatesPayload(); const fth = hashOf(ft);
     if (fth !== L.formsHash) {
       const r = await sb.from('form_templates').upsert(ft, { onConflict: 'business_id,template_id' });
@@ -439,6 +460,7 @@ const Cloud = {
     if (pairs.length > 1) { for (const p of pairs) await this.pushRows(table, [p], map); return; }   // find the one bad row
     const [x] = pairs[0];
     if (error.code === '23P01' && table === 'appointments') return this.refused(x, map);
+    if (error.code === '23514' && table === 'gift_card_uses') return this.giftRefused(x, map, error);
     const e = this.err(error); if (e.auth || !error.code) throw e;   // signed out or offline: stop and retry later
     // one bad record must not hold up everything else: keep going, report it, retry it next sync
     (this.rowErrors ||= []).push(`${table}: ${error.message}`);
@@ -451,6 +473,22 @@ const Cloud = {
     if (data && data[0]) { delete map[a.id]; this.mergeAppt(data[0]); toast(`Change undone for ${esc(who)}: that time was just booked online.`, 'bad'); }
     else { const i = st().appointments.indexOf(a); if (i >= 0) st().appointments.splice(i, 1); delete map[a.id]; toast(`Couldn't book ${esc(who)}: that time was just booked online.`, 'bad'); }
     invalidateIndex(); await this.pull(false); this.repaint();
+  },
+  // The database refused a gift card use: the card didn't have that much left (another iPad spent it first, or this one
+  // was offline). The use comes off this iPad's ledger, the sale is marked as still owing that amount, and the desk is told.
+  giftRefused(u, map, error) {
+    const arr = st().giftUses; const i = arr.indexOf(u); if (i >= 0) arr.splice(i, 1); delete map[u.id];
+    const g = st().giftCards.find((x) => x.id === u.cardId); const t = st().tickets.find((x) => x.id === u.ticketId); const c = t && clientById(t.clientId);
+    const code = g ? g.code : 'A gift card';
+    if (u.kind === 'redeem') {
+      if (t) {
+        const p = (t.payments || []).find((x) => x.cardId === u.cardId && !x.declined && Math.abs(x.amount - u.amount) < 0.005); if (p) p.declined = true;
+        t.giftShort = Math.round(((t.giftShort || 0) + u.amount) * 100) / 100; t.seeded = false;
+      }
+      toast(`${esc(code)} didn't have ${money(u.amount)} left: it was spent on another iPad first.${c ? ` Collect ${money(u.amount)} from ${esc(fullName(c))} another way.` : ''}`, 'bad', t ? { label: 'Ticket', act: 'open-ticket', attrs: `data-id="${t.id}"` } : undefined);
+    } else toast(`Couldn't change ${esc(code)}: ${esc(error.message)}`, 'bad');
+    Diag.report('sync', `gift card use refused: ${error.message}`);
+    this.again = true;   // send the marked sale and pull the card's real balance
   },
   subscribe() {
     if (CLOUD_CFG.realtime === false) return;
@@ -499,7 +537,7 @@ function emptyLiveState(entry, from, ids) {
   for (const k of keep) if (base[k] !== undefined) st0[k] = copy(base[k]);
   if (!from) { st0.staff = []; st0.services = []; }
   st0.business = { ...st0.business, name: entry.name };
-  Object.assign(st0, { clients: [], appointments: [], notes: [], photos: [], forms: [], messages: [], waitlist: [], refunds: [], tickets: [], giftCards: [] });
+  Object.assign(st0, { clients: [], appointments: [], notes: [], photos: [], forms: [], messages: [], waitlist: [], refunds: [], tickets: [], giftCards: [], giftUses: [] });
   st0.staff.forEach((s) => { delete s.bias; });
   st0.live = { businessId: entry.live.businessId, slug: entry.live.slug, timezone: entry.live.timezone, ids: ids ? copy(ids) : { staff: {}, services: {} }, synced: { appt: {}, client: {} }, lastPull: null, lastSync: null, catalogHash: null };
   return st0;

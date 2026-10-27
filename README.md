@@ -1,7 +1,7 @@
 # Luster
 
 Front-desk software for salons, spas and studios: calendar, client files, health intake and consents,
-checkout with refunds and store credit, online booking, messaging, reports. One business per
+checkout with refunds, store credit and gift cards, online booking, messaging, reports. One business per
 workspace, seven industry templates (facial, hair, lash, nails, massage, med spa, barber).
 
 This repository is also the live app. GitHub Pages serves the root folder, so the build committed
@@ -20,6 +20,15 @@ around today's date, and its texting and card reader are pretend. Live businesse
 booking) and never pretend: until texting and card payments are connected, texts open in the studio phone's Messages
 or Mail ready to send (and are logged as sent from the studio), and card payments are taken on the studio's own
 terminal and recorded in Luster.
+
+## The website
+
+A first visit to https://www.nwluster.com from a plain link (an Instagram bio, a typed address) lands on the website
+(`welcome/`): what Luster does, screenshots of the real app, a "Request a demo" form and "Try it yourself". Everyone
+who's opened the app on that device before, every setup or pitch link, and the installed app go straight to the app.
+
+- `https://www.nwluster.com/?demo` opens the sample studio; `https://www.nwluster.com/?signin` opens a studio's sign-in.
+- Demo requests are in Supabase → Table Editor → `demo_requests` (name, studio, how to reach them, what they use now).
 
 ## Personalized install links
 

@@ -73,7 +73,7 @@ function reminderText(a, c, link) {
   return `Hi ${c.first}, a reminder from ${b.name}: ${apptTitle(a)}${who ? ` with ${who}` : ''} ${when} at ${fmtTime(a.start)}.${link ? `\nNeed to change it? ${link}` : b.phone ? `\nNeed to change it? Call ${fmtPhone(b.phone)}.` : ''}`;
 }
 function receiptText(t, c) {
-  const b = st().business; const lines = t.lines.map((l) => `${l.name}${l.qty > 1 ? ` x${l.qty}` : ''}  ${money(l.price * l.qty)}`).join('\n');
+  const b = st().business; const lines = t.lines.map((l) => `${l.name}${l.qty > 1 ? ` x${l.qty}` : ''}${l.code ? ` (code ${l.code})` : ''}  ${money(l.price * l.qty)}`).join('\n');
   return `Thank you, ${c.first}! Your receipt from ${b.name}, ${fmtDate(t.date)}:\n${lines}${t.discount && t.discount.type !== 'none' ? '\nDiscount applied' : ''}${t.tax ? `\nTax  ${money(t.tax)}` : ''}${t.tip ? `\nTip  ${money(t.tip)}` : ''}\nTotal  ${money(t.total)}${(t.payments || []).length ? ` (${t.payments.map((p) => PAY_LABEL[p.method] || p.method).join(' + ')})` : ''}`;
 }
 // A form for the client to fill in on their own phone (book/?f=…). The database makes the link on the first sync.

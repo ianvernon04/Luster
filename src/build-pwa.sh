@@ -16,6 +16,11 @@ BUILT=$(date -u +%Y-%m-%dT%H:%MZ)
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+// A first visit from a plain link (an Instagram bio, a typed address) sees what Luster is first. Setup and pitch links
+// (?biz=, ?studio=, ?demo), sign-in links (#...), the installed app, and anyone who has opened the app here before go straight in.
+(function () { try { if (location.search || location.hash || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone || localStorage.getItem('luster.ws.index')) return; location.replace('welcome/'); } catch (e) {} })();
+</script>
 <meta name="theme-color" content="#1E5C68" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111516" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,6 +28,15 @@ BUILT=$(date -u +%Y-%m-%dT%H:%MZ)
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Luster">
 <meta name="description" content="Front-desk software for salons, spas and studios.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Luster">
+<meta property="og:title" content="Luster: the front desk that reads the intake form for you">
+<meta property="og:description" content="Booking, health intake, consents, checkout and gift cards for salons, spas and studios. See the live demo.">
+<meta property="og:url" content="https://www.nwluster.com/">
+<meta property="og:image" content="https://www.nwluster.com/welcome/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="luster-build" content="$HASH $BUILT">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -53,7 +67,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;                        // Supabase, fonts: straight to the network
   const rel = url.pathname.slice(new URL(self.registration.scope).pathname.length);
-  if (/^(book|supabase|src)\//.test(rel) || rel === '404.html') return;  // the public booking page is never served from this cache
+  if (/^(book|supabase|src|welcome)\//.test(rel) || rel === '404.html') return;  // the booking page and the website are never served from this cache
   const shell = rel === '' || rel === 'index.html';
   if (req.mode === 'navigate' && !shell) return;                     // other pages on the site (privacy, terms): network as usual
   const fresh = shell || rel === 'config.js';

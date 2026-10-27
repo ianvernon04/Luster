@@ -1,12 +1,15 @@
 /* ===== Reports ===== */
 const RANGES = { today: ['Today', 1], '7d': ['7 days', 7], '30d': ['30 days', 30], '90d': ['90 days', 90] };
 function rangeDates(key) { const n = RANGES[key][1]; const end = todayStr(); const start = addDays(end, -(n - 1)); return { start, end, prevStart: addDays(start, -n), prevEnd: addDays(start, -1), n }; }
+// a gift card is money held for the client, not revenue yet: it counts when it's spent, not when it's sold
+const giftSold = (t) => sum(t.lines.filter((l) => l.type === 'gift'), (l) => l.price * l.qty);
+const earned = (t) => Math.max(0, t.total - t.tip - giftSold(t));
 function periodStats(start, end) {
   const tix = st().tickets.filter((t) => t.date >= start && t.date <= end);
   const appts = st().appointments.filter((a) => a.date >= start && a.date <= end);
   const done = appts.filter((a) => a.status === 'completed'); const noshow = appts.filter((a) => a.status === 'noshow');
-  const refundList = st().refunds.filter((r) => r.date >= start && r.date <= end); const refunds = sum(refundList, (r) => r.amount - (r.tipRefunded || 0));
-  const revenue = sum(tix, (t) => t.total - t.tip) - refunds; const tips = sum(tix, (t) => t.tip) - sum(refundList, (r) => r.tipRefunded || 0);
+  const refundList = st().refunds.filter((r) => r.date >= start && r.date <= end); const refunds = sum(refundList, (r) => r.amount - (r.tipRefunded || 0) - sum((r.lines || []).filter((l) => l.type === 'gift'), (l) => l.amount));
+  const revenue = sum(tix, earned) - refunds; const tips = sum(tix, (t) => t.tip) - sum(refundList, (r) => r.tipRefunded || 0);
   const svcRev = sum(tix, (t) => sum(t.lines.filter((l) => l.type === 'service'), (l) => l.price * l.qty));
   const retailRev = sum(tix, (t) => sum(t.lines.filter((l) => l.type === 'product'), (l) => l.price * l.qty));
   const withRetail = tix.filter((t) => t.lines.some((l) => l.type === 'product')).length;
@@ -39,8 +42,8 @@ Views.reports = {
   render() {
     const r = rangeDates(S.ui.reportRange); const cur = periodStats(r.start, r.end); const prev = periodStats(r.prevStart, r.prevEnd); const hasPrior = diffDays(r.prevStart, todayStr()) <= HISTORY_DAYS;
     const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i));
-    const byDay = days.map((d) => sum(cur.tix.filter((t) => t.date === d), (t) => t.total - t.tip));
-    const sparkVals = r.n === 1 ? Array.from({ length: 12 }, (_, i) => sum(st().tickets.filter((t) => t.date === addDays(r.end, i - 11)), (t) => t.total - t.tip)) : (r.n <= 12 ? byDay : Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i * r.n / 12), b = Math.floor((i + 1) * r.n / 12); return sum(byDay.slice(a, b)); }));
+    const byDay = days.map((d) => sum(cur.tix.filter((t) => t.date === d), earned));
+    const sparkVals = r.n === 1 ? Array.from({ length: 12 }, (_, i) => sum(st().tickets.filter((t) => t.date === addDays(r.end, i - 11)), earned)) : (r.n <= 12 ? byDay : Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i * r.n / 12), b = Math.floor((i + 1) * r.n / 12); return sum(byDay.slice(a, b)); }));
     delta.off = !hasPrior;
     const tiles = `<div class="report-grid">
       <div class="stat span-4"><div class="label">Net revenue (before tips, after refunds)</div><div class="value">${money(cur.revenue, { whole: true })}</div>${delta(cur.revenue, prev.revenue)}${sparkline(sparkVals)}</div>
@@ -54,7 +57,7 @@ Views.reports = {
     </div>`;
     const catRev = CAT_ORDER.map((k) => ({ k, v: sum(cur.tix, (t) => sum(t.lines.filter((l) => l.type === 'service' && svcById(l.refId)?.cat === k), (l) => l.price * l.qty)) }));
     const retailV = cur.retailRev; const catMax = Math.max(...catRev.map((c) => c.v), retailV, 1);
-    const staffRows = bookableStaff().map((s) => { const booked = sum(cur.appts.filter((a) => a.staffId === s.id && !['cancelled', 'noshow'].includes(a.status)), (a) => a.dur); const avail = days.reduce((n, d) => { const h = s.days[dow(d)]; return n + (h ? h[1] - h[0] : 0); }, 0); const rev = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.total - t.tip); const tips = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.tip); return { s, util: avail ? booked / avail : 0, rev, tips, n: cur.tix.filter((t) => t.staffId === s.id).length }; });
+    const staffRows = bookableStaff().map((s) => { const booked = sum(cur.appts.filter((a) => a.staffId === s.id && !['cancelled', 'noshow'].includes(a.status)), (a) => a.dur); const avail = days.reduce((n, d) => { const h = s.days[dow(d)]; return n + (h ? h[1] - h[0] : 0); }, 0); const rev = sum(cur.tix.filter((t) => t.staffId === s.id), earned); const tips = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.tip); return { s, util: avail ? booked / avail : 0, rev, tips, n: cur.tix.filter((t) => t.staffId === s.id).length }; });
     const svcCounts = {}; for (const t of cur.tix) for (const l of t.lines) if (l.type === 'service') { const o = (svcCounts[l.refId] ||= { n: 0, rev: 0 }); o.n += l.qty; o.rev += l.price * l.qty; }
     const topSvc = Object.entries(svcCounts).map(([id, o]) => ({ s: svcById(id), ...o })).filter((x) => x.s).sort((a, b) => b.rev - a.rev).slice(0, 8);
     const hours = Array.from({ length: 11 }, (_, i) => 480 + i * 60); const dows = [1, 2, 3, 4, 5, 6];
@@ -72,8 +75,8 @@ Views.reports = {
   },
   mount(root) {
     const draw = () => { const el = $('[data-chart="revenue"]', root); if (!el) return; const r = rangeDates(S.ui.reportRange); const cur = periodStats(r.start, r.end); let labels, values, tips;
-      if (r.n === 1) { const hours = Array.from({ length: 12 }, (_, i) => 480 + i * 60); values = hours.map((h) => sum(cur.tix.filter((t) => { const m = new Date(t.closedAt); return m.getHours() * 60 >= h && m.getHours() * 60 < h + 60; }), (t) => t.total - t.tip)); labels = hours.map((h) => fmtTime(h)); tips = hours.map((h, i) => `${fmtTime(h)}–${fmtTime(h + 60)}: ${money(values[i])}`); }
-      else { const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i)); values = days.map((d) => sum(cur.tix.filter((t) => t.date === d), (t) => t.total - t.tip)); labels = days.map((d) => r.n <= 7 ? fmtDate(d, 'dow') : r.n <= 31 ? String(fromDateStr(d).getDate()) : fmtDate(d, 'short')); tips = days.map((d, i) => `${fmtDate(d, 'dow')}: ${money(values[i])} · ${cur.tix.filter((t) => t.date === d).length} tickets`); }
+      if (r.n === 1) { const hours = Array.from({ length: 12 }, (_, i) => 480 + i * 60); values = hours.map((h) => sum(cur.tix.filter((t) => { const m = new Date(t.closedAt); return m.getHours() * 60 >= h && m.getHours() * 60 < h + 60; }), earned)); labels = hours.map((h) => fmtTime(h)); tips = hours.map((h, i) => `${fmtTime(h)}–${fmtTime(h + 60)}: ${money(values[i])}`); }
+      else { const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i)); values = days.map((d) => sum(cur.tix.filter((t) => t.date === d), earned)); labels = days.map((d) => r.n <= 7 ? fmtDate(d, 'dow') : r.n <= 31 ? String(fromDateStr(d).getDate()) : fmtDate(d, 'short')); tips = days.map((d, i) => `${fmtDate(d, 'dow')}: ${money(values[i])} · ${cur.tix.filter((t) => t.date === d).length} tickets`); }
       el.innerHTML = barChart({ values, labels, tips, width: el.clientWidth || 600, height: 220, labelEvery: r.n > 31 ? 15 : r.n > 14 ? 5 : 1 }); };
     draw();
     if (window.ResizeObserver) { const ro = new ResizeObserver(debounce(draw, 120)); const el = $('[data-chart="revenue"]', root); if (el) ro.observe(el); }

@@ -46,7 +46,7 @@ async function loadState() {
     if (!st || st.version !== SEED_VERSION) st = buildInitialState(ws.templateId, ws.opts || {});
     else { syncCategories(st.categories); refreshSeededActivity(st); }
   }
-  S.state = st; st.refunds ||= []; st.clients.forEach((c) => { c.storeCredit ||= 0; }); syncCategories(st.categories); invalidateIndex();
+  S.state = st; st.refunds ||= []; normalizeGifts(st); st.clients.forEach((c) => { c.storeCredit ||= 0; }); syncCategories(st.categories); invalidateIndex();
   refreshTodayStatuses();
   try { localStorage.setItem(WS_CUR_KEY, ws.id); } catch (e) {}
   return st;
@@ -133,6 +133,26 @@ function clientStats(cid) {
   return { visits: count, spend, avg: count ? spend / count : 0, last, next, noshows: clientAppts(cid).filter((a) => a.status === 'noshow').length };
 }
 function clientFlags(c) { return c.flags.map((k) => FLAGS.find((f) => f.k === k)).filter(Boolean); }
+/* ---- gift cards: what a card holds is what it was sold for minus its ledger (spent, voided; a refund puts money back) ---- */
+const GIFT_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I: codes get read out over the phone
+const normGift = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const giftById = (id) => st().giftCards.find((g) => g.id === id);
+const giftByCode = (code) => { const n = normGift(code); return n ? st().giftCards.find((g) => normGift(g.code) === n) || null : null; };
+const giftUsesOf = (g) => st().giftUses.filter((u) => u.cardId === g.id);
+const giftBalance = (g) => Math.round((g.amount - sum(giftUsesOf(g), (u) => u.amount)) * 100) / 100;
+function newGiftCode() { for (;;) { const r = crypto.getRandomValues(new Uint8Array(8)); let s = ''; for (let i = 0; i < 8; i++) { s += GIFT_ABC[r[i] % 32]; if (i === 3) s += '-'; } if (!giftByCode(s)) return s; } }
+function useGiftCard(cardId, { kind, amount, ticketId = null }) { const u = { id: newId('gu_'), cardId, ticketId, kind, amount: Math.round(amount * 100) / 100, date: todayStr(), at: new Date().toISOString(), seeded: false }; st().giftUses.push(u); return u; }
+// iPads from before gift cards had their own codes kept only { code, balance }: each becomes a card worth what's left on it
+function normalizeGifts(s0) {
+  s0.giftCards ||= []; s0.giftUses ||= [];
+  const seen = new Set(s0.giftCards.filter((g) => g.id).map((g) => normGift(g.code)));
+  for (const g of s0.giftCards) if (!g.id) {
+    g.id = s0.live ? newUuid() : uid('g_'); g.amount = Math.round((g.balance || 0) * 100) / 100; g.date ||= todayStr(); g.clientId ||= null; g.ticketId ||= null; g.seeded = false; delete g.balance;
+    let code = String(g.code || 'GIFT').toUpperCase(); for (let n = 2; seen.has(normGift(code)); n++) code = `${String(g.code || 'GIFT').toUpperCase()}-${n}`;   // the old 4-digit codes could repeat
+    g.code = code; seen.add(normGift(code));
+  }
+  s0.giftCards = s0.giftCards.filter((g) => g.amount > 0);
+}
 /* Which of these services are unsafe or need a check for this client. Returns [{level, text, services:[names]}] worst first. */
 function contraindications(c, serviceIds) {
   const out = [];
@@ -251,7 +271,11 @@ function closeTicket(ticket) {
   if (t.appointmentId) { const a = apptById(t.appointmentId); if (a) { a.status = 'completed'; a.ticketId = t.id; a.touched = true; a.seeded = false; } }
   for (const l of t.lines) if (l.type === 'product') { const p = prodById(l.refId); if (p) p.stock = Math.max(0, p.stock - l.qty); }
   for (const p of t.payments) if (p.method === 'credit') { const c = clientById(t.clientId); if (c) { c.storeCredit = Math.max(0, Math.round(((c.storeCredit || 0) - p.amount) * 100) / 100); c.seeded = false; } }
-  for (const l of t.lines) if (l.type === 'gift') st().giftCards.push({ code: 'GLOW-' + String(rint(Math.random, 1000, 9999)), balance: l.price });
+  for (const l of t.lines) if (l.type === 'gift') {   // a real card with its own code, printed on the receipt
+    const g = { id: newId('g_'), code: newGiftCode(), amount: Math.round(l.price * (l.qty || 1) * 100) / 100, clientId: t.clientId || null, ticketId: t.id, date: t.date, seeded: false };
+    st().giftCards.push(g); l.cardId = g.id; l.code = g.code;
+  }
+  for (const p of t.payments) if (p.method === 'gift' && p.cardId) useGiftCard(p.cardId, { kind: 'redeem', amount: p.amount, ticketId: t.id });
   commit(); return t;
 }
 /* Refund part or all of a closed ticket. lines: [{name,type,refId,qty,amount,partial}], method: original payment method | 'credit' | 'cash'. */
@@ -263,6 +287,17 @@ function refundTicket(ticketId, { lines, tipRefunded = 0, method, reason, note =
   t.refunded = Math.round(((t.refunded || 0) + amount) * 100) / 100; (t.refundIds ||= []).push(r.id); t.seeded = false;
   for (const l of lines) if (l.type === 'product' && !l.partial) { const p = prodById(l.refId); if (p) p.stock += l.qty; }
   if (method === 'credit') { const c = clientById(t.clientId); if (c) { c.storeCredit = Math.round(((c.storeCredit || 0) + amount) * 100) / 100; c.seeded = false; } }
+  // a gift card sold on this ticket and refunded can't be spent any more (only what's still on it can be refunded)
+  for (const l of lines) if (l.type === 'gift' && l.cardId) { const g = giftById(l.cardId); const v = g ? Math.min(l.amount, giftBalance(g)) : 0; if (v > 0.004) useGiftCard(g.id, { kind: 'void', amount: v, ticketId: t.id }); }
+  // refunded to the gift card that paid: the money goes back on that card, up to what it paid
+  if (method === 'gift') {
+    let left = amount; const uses = st().giftUses.filter((u) => u.ticketId === t.id);
+    for (const u of uses.filter((x) => x.kind === 'redeem')) {
+      const back = -sum(uses.filter((x) => x.kind === 'refund' && x.cardId === u.cardId), (x) => x.amount);
+      const put = Math.min(left, Math.round((u.amount - back) * 100) / 100); if (put <= 0.004) continue;
+      uses.push(useGiftCard(u.cardId, { kind: 'refund', amount: -put, ticketId: t.id })); left = Math.round((left - put) * 100) / 100; r.giftBack = Math.round(((r.giftBack || 0) + put) * 100) / 100;
+    }
+  }
   commit(); return r;
 }
 function ticketRefunds(t) { return st().refunds.filter((r) => r.ticketId === t.id); }

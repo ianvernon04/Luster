@@ -1,5 +1,5 @@
 /* ===== Messages & automations ===== */
-const KIND_LABEL = { reminder: 'Reminder', confirmation: 'Confirmation', rebook: 'Rebook nudge', birthday: 'Birthday', manual: 'Manual', form: 'Form link', receipt: 'Receipt', cancellation: 'Cancellation' };
+const KIND_LABEL = { reminder: 'Reminder', confirmation: 'Confirmation', rebook: 'Rebook nudge', birthday: 'Birthday', manual: 'Manual', form: 'Form link', receipt: 'Receipt', cancellation: 'Cancellation', gift: 'Gift card' };
 const AUTOMATIONS = [
   ['confirmOnBooking', 'Confirmation when booked', 'Text (front desk) or email (online) the moment an appointment is made.'],
   ['sms24h', 'Reminder the day before', 'Sent at 10am. Replies with C confirm the appointment automatically.'],

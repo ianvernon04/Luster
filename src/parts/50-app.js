@@ -5,6 +5,8 @@
   App.render();
   installHint();
   Cloud.handleAuthRedirect();   // a reset or confirmation link from email
+  // "Sign in" on the website (?signin): open the studio's live business from the cloud
+  try { if (new URLSearchParams(location.search).has('signin')) { history.replaceState(null, '', location.pathname); if (!isLive() && Cloud.available()) Actions['cloud-from-cloud'](); } } catch (e) {}
   if (isLive()) Cloud.start();
   // leaving the app (home button, app switcher, lock screen): write this device's copy now and push what's waiting,
   // rather than trusting a timer that iOS may never let run

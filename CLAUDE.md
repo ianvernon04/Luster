@@ -40,6 +40,12 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 - `book/index.html` — the public booking page clients use (`/book/<slug>` via `404.html`, manage link `/book/?t=<token>`, forms
   `/book/?f=<token>`). Talks to Supabase only through the `booking_*` and `form_public_*` functions.
 - `privacy.html`, `terms.html` — public pages (the service worker never caches them as the app shell).
+- `welcome/` — the website. A first visit to the root from a plain link lands there: the root `index.html` (its head, written by
+  `build-pwa.sh`) redirects when there's no query string or hash, the app isn't installed, and the device has never opened the app
+  (`luster.ws.index`). Setup/pitch links, `?demo` (the website's "Try it yourself"), `?signin` (opens sign-in; `50-app.js`), email
+  links and installed iPads go straight to the app. "Request a demo" posts to `request_demo()`; requests land in `demo_requests`,
+  which only the Supabase dashboard can read. Its pictures are screenshots of the real app: `node ops/site-shots.mjs`, then
+  `python3 ops/site-images.py`, then `node ops/site-og.mjs` (link preview). The site says only what Luster does today.
 - `supabase/migrations/` — the database. `supabase/test/` — PGlite harness that imitates Supabase (`harness.mjs`), a stand-in for
   Supabase's HTTP API (`server.mjs`: PostgREST tables + RPC, password auth), fixtures, and the suites above.
 - `config.js` — public Supabase URL + anon key (safe to publish; RLS decides what the key can do). `vendor/` — supabase-js UMD build
@@ -62,7 +68,13 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
   `public_token` link), signed answers, health files, tickets, refunds, support events. Health files and signed answers are written
   by anyone on the team but read only by owners/managers/providers, fetched on demand, and every read is logged. Allergen names
   ride on the client row (`profile.allergies`): the front desk needs them. Still device-only: photos (next: Supabase Storage),
-  products/stock, memberships, gift card balances, messages, waitlist.
+  products/stock, memberships, messages, waitlist.
+- Gift cards: a card row (`gift_cards`: code, amount) plus an append-only ledger (`gift_card_uses`: redeem, refund = negative,
+  void). The database works out `balance_cents` from the ledger, never takes it from a device, and refuses a use that would take
+  a card below zero (23514); the iPad then drops that use, marks the ticket `giftShort` (the payment `declined`) and tells the
+  desk, who records the rest from the ticket. Uses are written when the ticket closes, never when the payment is applied, so a
+  voided ticket spends nothing. Balances on the iPad are `giftBalance(card)` = amount minus its ledger. Codes are 8 characters
+  without 0/O/1/I (`newGiftCode`); `normGift` matches them however they're typed.
 - Intake on the phone: `booking_create` returns `intake_token` for clients without a completed intake (`intake_link_for`); the
   phone renders the frozen definition, derives flags with `deriveIntake`, and `form_public_submit` files answers + signature,
   ADDS caution flags (never removes them) and merges the health file. Devices notice via `health_index(p_business, p_since)`.
@@ -71,8 +83,10 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 
 ## Conventions
 
-- Migrations: the four in `supabase/migrations/` were applied to production (project `rndipfzcdirenvarddws`, US East) on 2026-10-26
-  by pasting them into the SQL editor. Never edit an applied migration; add a new file.
+- Migrations: the first four in `supabase/migrations/` were applied to production (project `rndipfzcdirenvarddws`, US East) on
+  2026-10-26 by pasting them into the SQL editor; `20261027000005_gift_cards.sql` goes in with the gift card release (its SQL file
+  runs the migration before queuing the release), and `20261027000006_demo_requests.sql` with the website release. Never edit an
+  applied migration; add a new file. A release whose app needs a new migration ships both in one SQL file, migration first.
 - Releases: build on the tag of the last deployed release (`live-*`), pack with `ops/make-release.sh`, and deliver it as an INSERT into
   `releases` (pasted into the SQL editor; this sandbox can't reach supabase.co). The workflow reports the result back on the row.
 - Luster is made by New World Logic LLC (Louisiana); the terms, privacy page and emails name it. Account emails go
@@ -81,7 +95,8 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 - Luster is for any studio. Nothing studio-specific goes in templates, the legal pages, emails or the booking page; a studio's own
   menu lives in a profile (`32-studios.js`), reached only through its pitch link, holding only what the studio publishes itself, with
   placeholder staff names (the demo invents bookings and revenue per provider).
-- Bump `SEED_VERSION` only for demo-data shape changes; live workspaces are never reseeded (key `luster.live.<id>`).
+- Bump `SEED_VERSION` only for demo-data shape changes, or upgrade the old shape on load instead (`normalizeGifts` does that, so
+  pitch iPads keep their edits); live workspaces are never reseeded (key `luster.live.<id>`).
 - Keep everything relative (`./`): the app runs at the domain root, under `/luster/` in tests, and inside the claude.ai artifact.
 - Vertical-specific content lives in `TEMPLATES`; views read `tpl()`.
 - Safety first: services vs. client health go through `contraindications()` and the flag system. Client matching on the booking page

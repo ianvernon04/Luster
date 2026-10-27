@@ -3,7 +3,7 @@
 // Run after ./build-pwa.sh:  node test/pwa.js
 const { chromium } = require('playwright'); const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..', '..'); const PORT = 8766;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.css': 'text/css', '.md': 'text/plain' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.css': 'text/css', '.md': 'text/plain' };
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (!u.startsWith('/luster/')) { res.writeHead(404); return res.end(); }
   let f = path.join(ROOT, u.slice('/luster/'.length) || 'index.html'); if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
@@ -17,9 +17,31 @@ const eq = (a, b, what) => { if (a !== b) throw new Error(`${what}: got ${JSON.s
   await new Promise((r) => server.listen(PORT, r));
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const base = `http://localhost:${PORT}/luster/`;
+  // the website: a first visit from a plain link (an Instagram bio, a typed address) lands on it; everything that already
+  // worked (setup and pitch links, sign-in links, the installed app, a device that has opened the app) goes straight in
+  const c0 = await browser.newContext({ viewport: { width: 1280, height: 800 } }); const w = await c0.newPage(); w.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
+  await w.goto(base, { waitUntil: 'load' });
+  await t('a first visit from a plain link lands on the website', async () => { await w.waitForURL(base + 'welcome/'); if (!/reads the intake form/.test(await w.textContent('h1'))) throw new Error('no headline'); });
+  await t('the website\'s pictures load and its link preview is set', async () => {
+    const broken = await w.evaluate(async () => { const imgs = [...document.images]; imgs.forEach((i) => { i.loading = 'eager'; }); await new Promise((r) => setTimeout(r, 1000)); return imgs.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.src); });
+    eq(broken.length, 0, 'broken images ' + broken.join(', ')); if (!/\/welcome\/og\.jpg$/.test(await w.getAttribute('meta[property="og:image"]', 'content'))) throw new Error('og:image');
+    eq(await w.evaluate(async () => (await fetch('og.jpg')).ok), true, 'og.jpg missing');
+  });
+  await t('"Try it yourself" opens the demo, and from then on the address opens the app', async () => {
+    await w.click('.hero a[href="../?demo"]'); await w.waitForSelector('.cal-grid', { timeout: 15000 });
+    await w.goto(base, { waitUntil: 'load' }); await w.waitForSelector('.cal-grid', { timeout: 15000 }); eq(new URL(w.url()).pathname, '/luster/', 'returning visitor');
+  });
+  await c0.close();
+  await t('sign-in links and the installed app are never sent to the website', async () => {
+    const c = await browser.newContext(); const q = await c.newPage(); q.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
+    await q.goto(base + '#error=access_denied&error_description=Email%20link%20is%20invalid', { waitUntil: 'load' }); await q.waitForSelector('#rail .nav-item', { state: 'attached', timeout: 15000 });
+    eq(new URL(q.url()).pathname, '/luster/', 'email link'); await c.close();
+    const c2 = await browser.newContext(); await c2.addInitScript(() => { Object.defineProperty(window.navigator, 'standalone', { get: () => true }); }); const r2 = await c2.newPage();
+    await r2.goto(base, { waitUntil: 'load' }); await r2.waitForSelector('#rail .nav-item', { state: 'attached', timeout: 15000 }); eq(new URL(r2.url()).pathname, '/luster/', 'installed app'); await c2.close();
+  });
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'allow' });
   const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
-  await p.goto(base, { waitUntil: 'load' }); await p.waitForSelector('.cal-grid', { timeout: 15000 });
+  await p.goto(base + '?demo', { waitUntil: 'load' }); await p.waitForSelector('.cal-grid', { timeout: 15000 });
   await t('manifest is the static file with a relative scope', async () => { const m = await p.evaluate(async () => { const l = document.querySelector('link[rel=manifest]'); const r = await fetch(l.href); return { href: l.href, json: await r.json() }; }); if (!m.href.endsWith('/luster/manifest.webmanifest')) throw new Error(m.href); eq(m.json.scope, './', 'scope'); eq(m.json.start_url, './index.html', 'start_url'); });
   await t('service worker activates with the subpath scope', async () => {
     // ready resolves as soon as there is an active worker, which can still be "activating" on a slow machine: wait for the
@@ -53,13 +75,13 @@ const eq = (a, b, what) => { if (a !== b) throw new Error(`${what}: got ${JSON.s
   // iPad Safari: no install prompt exists, so the hint explains Share → Add to Home Screen
   const ipad = { userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', viewport: { width: 1024, height: 1366 }, hasTouch: true, isMobile: true };
   const c3 = await browser.newContext(ipad); const r = await c3.newPage(); r.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
-  await r.goto(base, { waitUntil: 'load' }); await r.waitForSelector('.cal-grid', { timeout: 15000 });
+  await r.goto(base + '?demo', { waitUntil: 'load' }); await r.waitForSelector('.cal-grid', { timeout: 15000 });
   await t('iPad gets the Add to Home Screen hint', async () => { await r.waitForSelector('.install-hint', { timeout: 4000 }); const txt = await r.textContent('.install-hint'); if (!/Add to Home Screen/.test(txt)) throw new Error(txt); await r.screenshot({ path: path.join(__dirname, 'shots', '40-install-hint-ipad.png') }); });
   await t('dismissing the hint sticks', async () => { await r.click('.install-hint [data-install-dismiss]'); await r.reload({ waitUntil: 'load' }); await r.waitForSelector('.cal-grid'); await r.waitForTimeout(2000); eq(await r.$('.install-hint'), null, 'hint'); });
   await c3.close();
   // Chrome's install prompt: a synthetic beforeinstallprompt shows the Install button
   const c4 = await browser.newContext({ viewport: { width: 1024, height: 768 } }); const s = await c4.newPage();
-  await s.goto(base, { waitUntil: 'load' }); await s.waitForSelector('.cal-grid');
+  await s.goto(base + '?demo', { waitUntil: 'load' }); await s.waitForSelector('.cal-grid');
   await t('Chrome install prompt becomes an Install button', async () => { await s.evaluate(() => { const e = new Event('beforeinstallprompt'); e.prompt = () => {}; e.userChoice = Promise.resolve({ outcome: 'accepted' }); window.dispatchEvent(e); }); await s.waitForSelector('.install-hint [data-install]', { timeout: 2000 }); await s.click('.install-hint [data-install]'); await s.waitForTimeout(200); eq(await s.$('.install-hint'), null, 'hint gone after accept'); });
   await c4.close();
   await browser.close(); server.close();

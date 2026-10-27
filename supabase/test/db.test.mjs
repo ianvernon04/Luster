@@ -266,6 +266,46 @@ await t('checkout: tickets and refunds sync, guarded against other studios\' ids
   await assert.rejects(as(db, U.other, `insert into tickets (business_id, client_id, sold_on, total_cents, data) values ($1, $2, current_date, 100, '{}')`, [other, cid]), /does not belong/);
   await assert.rejects(as(db, U.other, `insert into refunds (business_id, ticket_id, refunded_on, amount_cents, data) values ($1, $2, current_date, 100, '{}')`, [other, tid]), /does not belong/);
 });
+await t('gift cards: one balance for every device, never spent below zero, the ledger never rewritten', async () => {
+  const cid = (await one(db, U.owner, `select id from clients where business_id = $1 order by created_at limit 1`, [biz])).id;
+  const tid = (await one(db, U.desk, `insert into tickets (business_id, client_id, sold_on, total_cents, data) values ($1, $2, current_date, 10000, '{"lines":[{"type":"gift","name":"Gift card $100","price":100}]}') returning id`, [biz, cid])).id;
+  // the iPad that sold it sends the card; whatever balance it claims is ignored
+  const card = await one(db, U.desk, `insert into gift_cards (business_id, code, amount_cents, balance_cents, client_id, ticket_id, issued_on) values ($1, 'k7qm-4xpd', 10000, 999999, $2, $3, current_date) returning id, code, balance_cents`, [biz, cid, tid]);
+  assert.equal(card.code, 'K7QM-4XPD'); assert.equal(card.balance_cents, 10000);
+  const use = (id, cents, kind = 'redeem') => as(db, U.desk, `insert into gift_card_uses (id, business_id, card_id, ticket_id, kind, amount_cents, used_on) values ($1, $2, $3, $4, $5, $6, current_date)
+    on conflict (id) do update set amount_cents = excluded.amount_cents, kind = excluded.kind`, [id, biz, card.id, tid, kind, cents]);
+  const bal = async () => (await one(db, U.owner, `select balance_cents b from gift_cards where id = $1`, [card.id])).b;
+  const u1 = 'ccccccc1-0000-4000-8000-000000000001';
+  await use(u1, 6000); assert.equal(await bal(), 4000);
+  // a device that didn't hear back sends the same use again (or an altered copy): nothing changes
+  await use(u1, 6000); await use(u1, 100); assert.equal(await bal(), 4000);
+  assert.equal((await one(db, U.owner, `select amount_cents a from gift_card_uses where id = $1`, [u1])).a, 6000);
+  // another iPad tries to spend more than is left
+  await assert.rejects(use('ccccccc1-0000-4000-8000-000000000002', 5000), /has \$40\.00 left/);
+  assert.equal(await bal(), 4000);
+  // a refund goes back onto the card, never past what it was sold for, and only as a negative amount
+  await use('ccccccc1-0000-4000-8000-000000000003', -1000, 'refund'); assert.equal(await bal(), 5000);
+  await assert.rejects(use('ccccccc1-0000-4000-8000-000000000004', -6000, 'refund'), /more than it was sold for/);
+  await assert.rejects(use('ccccccc1-0000-4000-8000-000000000005', 1000, 'refund'), /check constraint/);
+  // what a card is worth and its code can't be edited, and its balance can't be set
+  await as(db, U.desk, `update gift_cards set amount_cents = 50000, balance_cents = 50000, code = 'FREE-MONEY' where id = $1`, [card.id]);
+  assert.deepEqual(await one(db, U.owner, `select amount_cents, balance_cents, code from gift_cards where id = $1`, [card.id]), { amount_cents: 10000, balance_cents: 5000, code: 'K7QM-4XPD' });
+  // nothing is ever deleted
+  await as(db, U.owner, `delete from gift_card_uses where id = $1`, [u1]); await as(db, U.owner, `delete from gift_cards where id = $1`, [card.id]);
+  assert.equal(await bal(), 5000);
+  // one code per studio
+  await assert.rejects(as(db, U.desk, `insert into gift_cards (business_id, code, amount_cents, issued_on) values ($1, 'K7QM-4XPD', 2500, current_date)`, [biz]), /duplicate key/);
+  // other studios can't see it, spend it, or point their own cards at this studio's sales
+  assert.equal((await one(db, U.other, `select count(*)::int n from gift_cards`)).n, 0);
+  const other = (await one(db, U.other, `select id from businesses where slug = 'other-test'`)).id;
+  await assert.rejects(as(db, U.other, `insert into gift_card_uses (business_id, card_id, kind, amount_cents, used_on) values ($1, $2, 'redeem', 100, current_date)`, [other, card.id]), /does not belong/);
+  await assert.rejects(as(db, U.other, `insert into gift_cards (business_id, code, amount_cents, ticket_id, issued_on) values ($1, 'ABCD-2345', 100, $2, current_date)`, [other, tid]), /does not belong/);
+  await assert.rejects(as(db, 'anon', `select * from gift_cards`), /permission denied/);
+  await assert.rejects(as(db, 'anon', `select * from gift_card_uses`), /permission denied/);
+  // the sale and every use are in the audit log
+  const log = (await as(db, U.owner, `select entity || ':' || action as e from audit_log where entity_id in ($1, $2) order by at`, [card.id, u1])).rows.map((r) => r.e);
+  assert.ok(log.includes('gift_cards:insert') && log.includes('gift_card_uses:insert'), JSON.stringify(log));
+});
 
 // ---------------------------------------------------------------- intake on the client's phone
 const intakeDef = { id: 'intake', name: 'New Client Intake', kind: 'intake', fields: [
@@ -336,6 +376,31 @@ await t('deleting a client: owners and managers only; hidden for the record, upc
   const slot = (await j(db, 'anon', `select public.booking_slots('simply-test', $1::uuid[], null, $2::date, 1)`, [[V.exp], nextDow(4, 10)])).days[0].slots[0];
   const b = await j(db, 'anon', `select public.booking_create('simply-test', $1::uuid[], $2::timestamptz, $3::jsonb)`, [[V.exp], slot.at, client({ first_name: 'Nora', phone: '2255550177' })]);
   const nc = await one(db, U.owner, `select client_id from appointments where id = $1`, [b.appointment.id]); assert.notEqual(nc.client_id, intakeClient, 'booked onto the deleted file');
+});
+
+// ---------------------------------------------------------------- the website
+await t('demo requests: anyone can ask, nobody signed in can read them, bots and floods are turned away', async () => {
+  const ask = (o) => j(db, 'anon', `select public.request_demo($1::jsonb)`, [JSON.stringify(o)]);
+  assert.deepEqual(await ask({ name: '  Kelsey  ', studio: 'Neu Skin Esthetics', email: 'Kelsey@Example.com', kind: 'Skin & facial studio', software: 'Square', best_time: 'Tue afternoon', message: 'Want to see the intake', founding: true, page: '/welcome/' }), { ok: true });
+  const r = await one(db, 'postgres', `select name, studio, email, phone, founding, status, software from demo_requests order by created_at desc limit 1`);
+  assert.deepEqual(r, { name: 'Kelsey', studio: 'Neu Skin Esthetics', email: 'kelsey@example.com', phone: null, founding: true, status: 'new', software: 'Square' });
+  assert.equal((await ask({ name: 'No Contact' })).reason, 'contact');
+  assert.equal((await ask({ name: 'Bad Email', email: 'not-an-email', phone: '555' })).reason, 'contact');
+  assert.equal((await ask({ email: 'x@example.com' })).reason, 'name');
+  assert.deepEqual(await ask({ name: 'Phone Only', phone: '(225) 555-0188' }), { ok: true });
+  assert.equal((await one(db, 'postgres', `select phone from demo_requests where name = 'Phone Only'`)).phone, '2255550188');
+  // the hidden field: thanked, not kept
+  assert.deepEqual(await ask({ name: 'Bot', email: 'bot@example.com', website: 'http://spam.example' }), { ok: true });
+  assert.equal((await one(db, 'postgres', `select count(*)::int n from demo_requests where name = 'Bot'`)).n, 0);
+  // nobody but Luster reads them
+  await assert.rejects(as(db, 'anon', `select * from demo_requests`), /permission denied/);
+  await assert.rejects(as(db, U.owner, `select * from demo_requests`), /permission denied/);
+  await assert.rejects(as(db, 'anon', `insert into demo_requests (name) values ('direct')`), /permission denied/);
+  // five an hour from one address
+  await db.exec(`select set_config('request.headers', '{"x-forwarded-for": "198.51.100.7"}', false)`);
+  for (let i = 0; i < 5; i++) assert.deepEqual(await ask({ name: 'Flood ' + i, email: `f${i}@example.com` }), { ok: true });
+  assert.equal((await ask({ name: 'Flood 6', email: 'f6@example.com' })).reason, 'rate_limited');
+  await db.exec(`select set_config('request.headers', '', false)`);
 });
 
 // ---------------------------------------------------------------- remote support

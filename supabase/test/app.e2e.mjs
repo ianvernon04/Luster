@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url)); const root = path.res
 const shots = path.join(here, 'shots'); fs.mkdirSync(shots, { recursive: true });
 
 let fails = 0; const errors = [];
-const t = async (name, fn) => { try { await fn(); console.log('ok   ', name); } catch (e) { fails++; console.log('FAIL ', name, '-', e.message.split('\n')[0]); } };
+const t = async (name, fn) => { try { await fn(); console.log('ok   ', name); } catch (e) { fails++; console.log('FAIL ', name, '-', e.message.split('\n').filter(Boolean).slice(0, 3).join(' | ')); } };
 const ok = (c, m) => { if (!c) throw new Error(m); };
 // CI runners are slower than a laptop: stretch every wait there (LUSTER_TEST_SLOW=2 to try it locally)
 const SLOW = Number(process.env.LUSTER_TEST_SLOW || (process.env.CI ? 3 : 1));
@@ -196,7 +196,7 @@ await t('reload: still signed in, still live, data back instantly from the devic
 let pad2;
 await t('a second iPad signs in and opens the same business from the cloud', async () => {
   const { p } = await ctx(ipad); pad2 = p;
-  await p.goto(base); await p.waitForSelector('#rail .nav-item', { state: 'attached' });
+  await p.goto(base + '?demo'); await p.waitForSelector('#rail .nav-item', { state: 'attached' });
   await p.evaluate(() => Actions.workspaces()); await p.click('[data-act="cloud-from-cloud"]');
   await p.waitForSelector('#ca-email'); await p.fill('#ca-email', 'ixv@nwluster.com'); await p.fill('#ca-pass', 'correct-horse-battery'); await p.click('[data-act="cloud-auth-submit"]');
   await p.waitForSelector('[data-act="cloud-open-biz"]'); await p.click('[data-act="cloud-open-biz"]');
@@ -233,6 +233,47 @@ await t('a deleted note disappears everywhere but stays in the record', async ()
   await until(async () => (await as(db, 'postgres', `select deleted_at from notes where id = $1`, [nid])).rows[0].deleted_at, 6000, 'soft delete in cloud');
   await pad2.evaluate(() => Cloud.sync());
   await until(() => pad2.evaluate((id) => !window.Luster.state.notes.some((n) => n.id === id), nid), 6000, 'note gone on iPad 2');
+});
+await t('gift cards: sold on one iPad, spent on the other, and the same money can\'t be spent twice', async () => {
+  const biz = (await as(db, 'postgres', `select id from businesses where slug = 'luster-test'`)).rows[0].id;
+  const cloudBalance = async (id) => (await as(db, 'postgres', `select balance_cents from gift_cards where id = $1`, [id])).rows[0].balance_cents;
+  // iPad 1 sells a $100 card; the code is on the receipt and goes out from the studio's phone
+  await pad.evaluate((cid) => startTicket({ clientId: cid }), ava); await pad.waitForSelector('.ticket');
+  await pad.click('[data-act="co-tab"][data-id="gift"]'); await pad.click('[data-act="ticket-add"][data-type="gift"][data-id="100"]');
+  await pad.click('[data-act="pay"][data-m="cash"]'); await pad.waitForSelector('#cash-tendered'); await pad.click('[data-act="cash-done"]');
+  await pad.waitForSelector('.gift-codes .gift-code'); const code = (await pad.textContent('.gift-codes .gift-code')).trim();
+  await pad.screenshot({ path: `${shots}/a10-gift-sold.png` });
+  await pad.click('[data-act="gift-send"]'); await pad.waitForSelector('#ho-body'); ok((await pad.inputValue('#ho-body')).includes(code), 'code not in the message');
+  await pad.click('#modal-root [data-act="close-modal"]');
+  const card = await until(async () => (await as(db, 'postgres', `select id, balance_cents, client_id, ticket_id from gift_cards where business_id = $1 and code = $2`, [biz, code])).rows[0], 8000, 'card in the cloud');
+  ok(card.balance_cents === 10000 && card.client_id === ava, JSON.stringify(card));
+  await until(async () => (await as(db, 'postgres', `select ticket_id from gift_cards where id = $1`, [card.id])).rows[0].ticket_id, 8000, 'card linked to its sale');
+  // iPad 2 has never seen the card: it checks the code with the cloud, and the visit comes off the card
+  const v = await pad2.evaluate(() => window.Luster.state.services.filter((s) => !s.internal && !s.hidden && s.price >= 20 && s.price <= 80).sort((a, b) => a.price - b.price)[0]);
+  await pad2.evaluate((cid) => { closeModal(); startTicket({ clientId: cid }); }, ava); await pad2.waitForSelector('.ticket');   // the signed form from the last test is still open there
+  await pad2.click(`[data-act="ticket-add"][data-type="service"][data-id="${v.id}"]`);
+  await pad2.click('[data-act="pay"][data-m="gift"]'); await pad2.waitForSelector('#gift-code'); await pad2.fill('#gift-code', code.replace('-', ' ').toLowerCase()); await pad2.click('[data-act="gift-apply"]');
+  await pad2.waitForSelector('#modal-root [data-act="receipt-done"]');
+  const paid = await pad2.evaluate(() => { const ts = window.Luster.state.tickets; return ts[ts.length - 1].payments.find((p) => p.method === 'gift').amount; });
+  ok(paid === v.price, `paid ${paid} for a ${v.price} visit`); await pad2.click('#modal-root [data-act="receipt-done"]');
+  await until(async () => (await cloudBalance(card.id)) === 10000 - paid * 100, 8000, 'balance in the cloud after spending');
+  await pad.evaluate(() => Cloud.sync());
+  await until(() => pad.evaluate(({ code, want }) => Math.abs(giftBalance(giftByCode(code)) - want) < 0.001, { code, want: 100 - paid }), 8000, 'new balance on iPad 1');
+  // another device spends all but $10 a moment before iPad 1 rings up the rest of the card: the cloud refuses iPad 1's use
+  const rest = 100 - paid;
+  await as(db, 'postgres', `insert into gift_card_uses (business_id, card_id, kind, amount_cents, used_on) values ($1, $2, 'redeem', $3, current_date)`, [biz, card.id, (rest - 10) * 100]);
+  const tid = await pad.evaluate(({ cid, code, rest, v }) => { const g = giftByCode(code); return closeTicket({ appointmentId: null, clientId: cid, staffId: 's1', date: todayStr(), lines: [{ type: 'service', refId: v.id, name: v.name, price: rest, qty: 1, staffId: 's1', note: '' }], discount: 0, tip: 0, tax: 0, total: rest, payments: [{ method: 'gift', amount: rest, last4: code.slice(-4), cardId: g.id, code }] }).id; }, { cid: ava, code, rest, v });
+  await until(async () => /didn.t have/.test(await pad.textContent('#toasts')), 8000, 'overspent toast');
+  ok((await cloudBalance(card.id)) === 1000, 'cloud balance changed: ' + await cloudBalance(card.id));
+  const after = await pad.evaluate(({ code, tid }) => ({ left: giftBalance(giftByCode(code)), short: window.Luster.state.tickets.find((t) => t.id === tid).giftShort, uses: window.Luster.state.giftUses.filter((u) => u.ticketId === tid).length }), { code, tid });
+  ok(after.uses === 0 && after.short === rest && Math.abs(after.left - 10) < 0.001, JSON.stringify(after));
+  await until(async () => Number((await as(db, 'postgres', `select data ->> 'giftShort' s from tickets where id = $1`, [tid])).rows[0]?.s) === rest, 8000, 'the sale marked as still owing');
+  await pad.screenshot({ path: `${shots}/a11-gift-refused.png` });
+  // the desk takes the rest in cash and records it on the ticket
+  await pad.evaluate((id) => openModal('ticket', { id }), tid); await pad.waitForSelector('#modal-root [data-act="short-pay"]');
+  ok(/declined/.test(await pad.textContent('#modal-root')), 'declined gift payment not shown');
+  await pad.click('#modal-root [data-act="short-pay"]'); await pad.click('#modal-root [data-act="short-paid"][data-m="cash"]');
+  await until(async () => { const d = (await as(db, 'postgres', `select data from tickets where id = $1`, [tid])).rows[0].data; return Number(d.giftShort) === 0 && d.payments.some((x) => x.method === 'cash' && x.amount === rest) && d.payments.some((x) => x.method === 'gift' && x.declined); }, 8000, 'settled in the cloud');
 });
 await t('a live business never pretends: texts hand off to the studio phone, cards are recorded not charged', async () => {
   const before = await pad.evaluate(() => window.Luster.state.messages.length);
@@ -298,9 +339,27 @@ await t('website kit: button code with the booking link, a QR code, a printable 
   if (process.env.LUSTER_KEEP_QR) fs.copyFileSync(await dl.path(), process.env.LUSTER_KEEP_QR);
   await pad.waitForTimeout(150); await pad.screenshot({ path: `${shots}/a9-website-kit.png` });
 });
+await t('the website: a first visit lands on it, a demo request reaches Luster, Sign in opens the studio, the demo links back', async () => {
+  const { c, p } = await ctx(phone);
+  await p.goto(base); await p.waitForURL(/\/welcome\/$/); await p.waitForSelector('#rq');
+  ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'the website scrolls sideways on a phone');
+  await p.click('#rq button[type="submit"]'); await p.waitForSelector('#rq-err.on'); ok(/your name/.test(await p.textContent('#rq-err')), 'an empty request went through');
+  await p.fill('#rq-name', 'Kelsey Test'); await p.click('#rq button[type="submit"]'); ok(/email or a mobile/.test(await p.textContent('#rq-err')), 'a request with no way to reach them went through');
+  await p.fill('#rq-studio', 'Neu Skin Test'); await p.fill('#rq-phone', '(225) 555-0177'); await p.selectOption('#rq-kind', 'Med spa'); await p.fill('#rq-software', 'Square');
+  await p.click('#founding [data-founding]'); ok(await p.isChecked('#rq-founding'), 'founding box not ticked');
+  await p.click('#rq button[type="submit"]'); await p.waitForSelector('#rq-thanks.on');
+  ok(/Thank you, Kelsey!/.test(await p.textContent('#rq-thanks')), 'no thank-you');
+  const row = (await as(db, 'postgres', `select name, studio, phone, kind, software, founding, status, page from demo_requests where name = 'Kelsey Test'`)).rows[0];
+  ok(row && row.phone === '2255550177' && row.founding === true && row.status === 'new' && row.kind === 'Med spa' && row.page === '/welcome/', JSON.stringify(row));
+  await p.screenshot({ path: `${shots}/a12-website-request.png` });
+  await p.goto(base + 'welcome/'); await p.click('footer a[href="../?signin"]'); await p.waitForSelector('#ca-email');
+  ok(!/signin/.test(p.url()), 'the sign-in flag stayed in the address'); await c.close();
+  const { c: c2, p: d } = await ctx(ipad); await d.goto(base + '?demo'); await d.waitForSelector('#rail .nav-item', { state: 'attached' });
+  await d.click('.rail-foot a[href="welcome/"]'); await d.waitForURL(/\/welcome\/$/); await c2.close();
+});
 await t('forgot password: the emailed link opens the app, a new password is set, an old link is refused', async () => {
   const { p } = await ctx(ipad);
-  await p.goto(base); await p.waitForSelector('#rail .nav-item', { state: 'attached' });
+  await p.goto(base + '?demo'); await p.waitForSelector('#rail .nav-item', { state: 'attached' });
   await p.evaluate(() => Actions['cloud-from-cloud']()); await p.waitForSelector('[data-act="cloud-auth-forgot"]');
   await p.click('[data-act="cloud-auth-forgot"]'); await p.fill('#ca-email', 'ixv@nwluster.com'); await p.click('[data-act="cloud-auth-reset"]');
   await p.waitForSelector('#modal-root .alert.info'); ok(/reset link is on its way/.test(await p.textContent('#modal-root')), 'no confirmation');

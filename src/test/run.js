@@ -87,6 +87,48 @@ async function page(browser, opts = {}) {
     if (credit.credit < 10 || credit.refunded < 10) throw new Error('credit not applied ' + JSON.stringify(credit));
     await p.click('[data-act="refunds-list"]'); await p.waitForSelector('.modal .table'); await p.click('[data-act="close-modal"]');
   });
+  await t('gift cards: sold with a code on the receipt, spent by code, refunded back onto it, voided', async () => {
+    await p.click('[data-act="go"][data-view="checkout"]'); await p.waitForSelector('.open-appts, .empty');
+    const [buyer, spender] = await p.evaluate(() => { const cs = window.Luster.state.clients; return [cs[3].id, cs[4].id]; });
+    const lastTicket = () => p.evaluate(() => { const ts = window.Luster.state.tickets; return ts[ts.length - 1]; });
+    const balance = (code) => p.evaluate((c) => giftBalance(giftByCode(c)), code);
+    // sell a $60 card (any amount)
+    await p.evaluate((id) => startTicket({ clientId: id }), buyer); await p.waitForSelector('.ticket');
+    await p.click('[data-act="co-tab"][data-id="gift"]'); await p.click('[data-act="gift-other"]'); await p.fill('#gift-amt', '60'); await p.click('[data-act="gift-other-add"]');
+    await p.click('[data-act="pay"][data-m="cash"]'); await p.waitForSelector('#cash-tendered'); await p.click('[data-act="cash-done"]'); await p.waitForSelector('.gift-codes .gift-code');
+    const code = (await p.textContent('.gift-codes .gift-code')).trim(); if (!/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(code)) throw new Error('bad code ' + code);
+    await p.screenshot({ path: `${OUT}/22-gift-sold.png` });
+    await p.click('[data-act="gift-send"]'); await p.waitForTimeout(80); if (!/texted/.test(await lastToast(p))) throw new Error('code not sent: ' + await lastToast(p));
+    const sale = (await lastTicket()).id; await p.click('[data-act="receipt-done"]');
+    if (await balance(code) !== 60) throw new Error('new card balance ' + await balance(code));
+    // spend part of it, typed the lazy way (lowercase, no dash)
+    const svc = await p.evaluate(() => window.Luster.state.services.filter((s) => !s.internal && !s.hidden && s.price > 0 && s.price < 60).sort((a, b) => a.price - b.price)[0]);
+    await p.evaluate((id) => startTicket({ clientId: id }), spender); await p.waitForSelector('.ticket');
+    await p.click(`[data-act="ticket-add"][data-type="service"][data-id="${svc.id}"]`);
+    await p.click('[data-act="pay"][data-m="gift"]'); await p.waitForSelector('#gift-code'); await p.fill('#gift-code', code.replace('-', '').toLowerCase()); await p.click('[data-act="gift-apply"]');
+    await p.waitForSelector('.confirm-tick');
+    const spend = await lastTicket(); const paid = spend.payments.find((x) => x.method === 'gift'); if (!paid || paid.code !== code) throw new Error('gift payment ' + JSON.stringify(spend.payments));
+    if (Math.abs(await balance(code) - (60 - paid.amount)) > 0.001) throw new Error(`balance ${await balance(code)} after spending ${paid.amount}`);
+    await p.click('[data-act="receipt-done"]');
+    // refund that visit to the original payment: the money goes back on the card
+    await p.evaluate((id) => openModal('refund', { id }), spend.id); await p.waitForSelector('#rf-method');
+    await p.check('[data-rl="0"]'); await p.selectOption('#rf-reason', 'Service issue'); await p.click('#rf-submit'); await p.waitForTimeout(100);
+    if (!/back on the gift card/.test(await lastToast(p))) throw new Error('no gift refund toast: ' + await lastToast(p));
+    if (Math.abs(await balance(code) - 60) > 0.001) throw new Error('refund not back on the card: ' + await balance(code));
+    // refund the card itself (cash back to the buyer): it can't be spent any more
+    await p.evaluate((id) => openModal('refund', { id }), sale); await p.waitForSelector('#rf-method');
+    await p.check('[data-rl="0"]'); await p.selectOption('#rf-method', 'cash'); await p.click('#rf-submit'); await p.waitForTimeout(100);
+    if (!/voided/.test(await lastToast(p))) throw new Error('card not voided: ' + await lastToast(p));
+    if (await balance(code) !== 0) throw new Error('voided card still holds ' + await balance(code));
+    // the balance lookup shows the card's history
+    await p.click('[data-act="gift-lookup"]'); await p.waitForSelector('#gl-code'); await p.fill('#gl-code', code); await p.waitForTimeout(80);
+    const hist = await p.textContent('#gl-result'); if (!/Spent/.test(hist) || !/Refunded back/.test(hist) || !/Voided/.test(hist)) throw new Error('history: ' + hist);
+    await p.screenshot({ path: `${OUT}/23-gift-lookup.png` }); await p.click('[data-act="close-modal"]');
+    // an iPad from before gift cards had their own codes: its cards keep their value, repeated codes get told apart
+    const old = await p.evaluate(() => { const demo = { giftCards: [{ code: 'GLOW-1111', balance: 40 }, { code: 'GLOW-1111', balance: 15 }, { code: 'GLOW-2222', balance: 0 }] }; const live = { live: {}, giftCards: [{ code: 'GLOW-3333', balance: 25.5 }] }; normalizeGifts(demo); normalizeGifts(live); return { demo, live }; });
+    const d = old.demo.giftCards; if (d.length !== 2 || d[0].amount !== 40 || d[1].code !== 'GLOW-1111-2' || d[1].amount !== 15 || !d[0].id || old.demo.giftUses.length !== 0) throw new Error('old demo cards: ' + JSON.stringify(old.demo));
+    if (!/^[0-9a-f-]{36}$/.test(old.live.giftCards[0].id) || old.live.giftCards[0].amount !== 25.5 || old.live.giftCards[0].seeded !== false) throw new Error('old live card: ' + JSON.stringify(old.live));
+  });
   await t('intake form: conditional cancer block + health tab', async () => {
     await p.click('[data-act="go"][data-view="forms"]'); await p.waitForSelector('.table, .empty');
     const fid = await p.evaluate(() => { let f = window.Luster.state.forms.find((x) => x.status === 'sent' && x.templateId === 'intake'); if (!f) { const c = window.Luster.state.clients[50]; f = sendForm(c.id, 'intake'); } return f.id; });

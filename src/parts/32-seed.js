@@ -317,7 +317,8 @@ function buildInitialState(templateId = 'facial', opts = {}) {
   const clients = generateClients(mulberry32(20261022), cat);
   const today = todayStr();
   const act = generateActivity(cat, clients, today, mulberry32(777));
-  return { version: SEED_VERSION, seedDay: today, ...cat, clients, appointments: act.appts, tickets: act.tickets, notes: act.notes, photos: act.photos, forms: act.forms, messages: act.messages, waitlist: act.waitlist, refunds: act.refunds, giftCards: [{ code: 'GLOW-2048', balance: 100 }, { code: 'GLOW-7731', balance: 45 }] };
+  return { version: SEED_VERSION, seedDay: today, ...cat, clients, appointments: act.appts, tickets: act.tickets, notes: act.notes, photos: act.photos, forms: act.forms, messages: act.messages, waitlist: act.waitlist, refunds: act.refunds, giftCards: [{ id: 'g_demo1', code: 'GLOW-2048', amount: 100, clientId: null, ticketId: null, date: addDays(today, -40), seeded: true }, { id: 'g_demo2', code: 'GLOW-7731', amount: 75, clientId: null, ticketId: null, date: addDays(today, -65), seeded: true }],
+    giftUses: [{ id: 'gu_demo1', cardId: 'g_demo2', ticketId: null, kind: 'redeem', amount: 30, date: addDays(today, -12), at: null, seeded: true }] };
 }
 /* Re-generates only the seeded activity so the demo always looks live today; everything the user created or edited is kept. */
 function refreshSeededActivity(state) {

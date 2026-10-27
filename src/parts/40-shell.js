@@ -43,7 +43,7 @@ function renderRail() {
     <div class="rail-foot">
       <span class="perf"><span class="perf-dot"></span>Rendered in <b id="perf-ms" class="num">${Math.max(1, Math.round(App.lastRenderMs))} ms</b></span>
       ${isLive() ? `${cloudStatusHtml()}<span>${esc(st().business.name)} · ${st().clients.length} clients · ${st().appointments.length} appointments</span>` : `<span>All data on this device. No spinners.</span>
-      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>`}
+      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>${/^https?:$/.test(location.protocol) && window.top === window.self ? '<a href="welcome/">What is Luster? →</a>' : ''}`}
     </div>`;
 }
 function renderTabbar() {

@@ -242,6 +242,11 @@ img, svg, canvas { max-width: 100%; }
 .kv dt { color: var(--ink-3); } .kv dd { margin: 0; min-width: 0; }
 .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; }
 .alert svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.rail-foot a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.rail-foot a:hover { text-decoration: underline; }
+.gift-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 20px; font-weight: 700; letter-spacing: .08em; }
+.gift-code.sm { font-size: 14px; letter-spacing: .06em; }
+.gift-codes { margin-top: 12px; }
 .alert.warn { background: var(--warn-soft); color: var(--warn-ink); }
 .alert.bad { background: var(--bad-soft); color: var(--bad-ink); }
 .alert.info { background: var(--accent-soft); color: var(--accent-strong); }
@@ -1696,7 +1701,8 @@ function buildInitialState(templateId = 'facial', opts = {}) {
   const clients = generateClients(mulberry32(20261022), cat);
   const today = todayStr();
   const act = generateActivity(cat, clients, today, mulberry32(777));
-  return { version: SEED_VERSION, seedDay: today, ...cat, clients, appointments: act.appts, tickets: act.tickets, notes: act.notes, photos: act.photos, forms: act.forms, messages: act.messages, waitlist: act.waitlist, refunds: act.refunds, giftCards: [{ code: 'GLOW-2048', balance: 100 }, { code: 'GLOW-7731', balance: 45 }] };
+  return { version: SEED_VERSION, seedDay: today, ...cat, clients, appointments: act.appts, tickets: act.tickets, notes: act.notes, photos: act.photos, forms: act.forms, messages: act.messages, waitlist: act.waitlist, refunds: act.refunds, giftCards: [{ id: 'g_demo1', code: 'GLOW-2048', amount: 100, clientId: null, ticketId: null, date: addDays(today, -40), seeded: true }, { id: 'g_demo2', code: 'GLOW-7731', amount: 75, clientId: null, ticketId: null, date: addDays(today, -65), seeded: true }],
+    giftUses: [{ id: 'gu_demo1', cardId: 'g_demo2', ticketId: null, kind: 'redeem', amount: 30, date: addDays(today, -12), at: null, seeded: true }] };
 }
 /* Re-generates only the seeded activity so the demo always looks live today; everything the user created or edited is kept. */
 function refreshSeededActivity(state) {
@@ -1867,7 +1873,7 @@ async function loadState() {
     if (!st || st.version !== SEED_VERSION) st = buildInitialState(ws.templateId, ws.opts || {});
     else { syncCategories(st.categories); refreshSeededActivity(st); }
   }
-  S.state = st; st.refunds ||= []; st.clients.forEach((c) => { c.storeCredit ||= 0; }); syncCategories(st.categories); invalidateIndex();
+  S.state = st; st.refunds ||= []; normalizeGifts(st); st.clients.forEach((c) => { c.storeCredit ||= 0; }); syncCategories(st.categories); invalidateIndex();
   refreshTodayStatuses();
   try { localStorage.setItem(WS_CUR_KEY, ws.id); } catch (e) {}
   return st;
@@ -1954,6 +1960,26 @@ function clientStats(cid) {
   return { visits: count, spend, avg: count ? spend / count : 0, last, next, noshows: clientAppts(cid).filter((a) => a.status === 'noshow').length };
 }
 function clientFlags(c) { return c.flags.map((k) => FLAGS.find((f) => f.k === k)).filter(Boolean); }
+/* ---- gift cards: what a card holds is what it was sold for minus its ledger (spent, voided; a refund puts money back) ---- */
+const GIFT_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I: codes get read out over the phone
+const normGift = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const giftById = (id) => st().giftCards.find((g) => g.id === id);
+const giftByCode = (code) => { const n = normGift(code); return n ? st().giftCards.find((g) => normGift(g.code) === n) || null : null; };
+const giftUsesOf = (g) => st().giftUses.filter((u) => u.cardId === g.id);
+const giftBalance = (g) => Math.round((g.amount - sum(giftUsesOf(g), (u) => u.amount)) * 100) / 100;
+function newGiftCode() { for (;;) { const r = crypto.getRandomValues(new Uint8Array(8)); let s = ''; for (let i = 0; i < 8; i++) { s += GIFT_ABC[r[i] % 32]; if (i === 3) s += '-'; } if (!giftByCode(s)) return s; } }
+function useGiftCard(cardId, { kind, amount, ticketId = null }) { const u = { id: newId('gu_'), cardId, ticketId, kind, amount: Math.round(amount * 100) / 100, date: todayStr(), at: new Date().toISOString(), seeded: false }; st().giftUses.push(u); return u; }
+// iPads from before gift cards had their own codes kept only { code, balance }: each becomes a card worth what's left on it
+function normalizeGifts(s0) {
+  s0.giftCards ||= []; s0.giftUses ||= [];
+  const seen = new Set(s0.giftCards.filter((g) => g.id).map((g) => normGift(g.code)));
+  for (const g of s0.giftCards) if (!g.id) {
+    g.id = s0.live ? newUuid() : uid('g_'); g.amount = Math.round((g.balance || 0) * 100) / 100; g.date ||= todayStr(); g.clientId ||= null; g.ticketId ||= null; g.seeded = false; delete g.balance;
+    let code = String(g.code || 'GIFT').toUpperCase(); for (let n = 2; seen.has(normGift(code)); n++) code = `${String(g.code || 'GIFT').toUpperCase()}-${n}`;   // the old 4-digit codes could repeat
+    g.code = code; seen.add(normGift(code));
+  }
+  s0.giftCards = s0.giftCards.filter((g) => g.amount > 0);
+}
 /* Which of these services are unsafe or need a check for this client. Returns [{level, text, services:[names]}] worst first. */
 function contraindications(c, serviceIds) {
   const out = [];
@@ -2072,7 +2098,11 @@ function closeTicket(ticket) {
   if (t.appointmentId) { const a = apptById(t.appointmentId); if (a) { a.status = 'completed'; a.ticketId = t.id; a.touched = true; a.seeded = false; } }
   for (const l of t.lines) if (l.type === 'product') { const p = prodById(l.refId); if (p) p.stock = Math.max(0, p.stock - l.qty); }
   for (const p of t.payments) if (p.method === 'credit') { const c = clientById(t.clientId); if (c) { c.storeCredit = Math.max(0, Math.round(((c.storeCredit || 0) - p.amount) * 100) / 100); c.seeded = false; } }
-  for (const l of t.lines) if (l.type === 'gift') st().giftCards.push({ code: 'GLOW-' + String(rint(Math.random, 1000, 9999)), balance: l.price });
+  for (const l of t.lines) if (l.type === 'gift') {   // a real card with its own code, printed on the receipt
+    const g = { id: newId('g_'), code: newGiftCode(), amount: Math.round(l.price * (l.qty || 1) * 100) / 100, clientId: t.clientId || null, ticketId: t.id, date: t.date, seeded: false };
+    st().giftCards.push(g); l.cardId = g.id; l.code = g.code;
+  }
+  for (const p of t.payments) if (p.method === 'gift' && p.cardId) useGiftCard(p.cardId, { kind: 'redeem', amount: p.amount, ticketId: t.id });
   commit(); return t;
 }
 /* Refund part or all of a closed ticket. lines: [{name,type,refId,qty,amount,partial}], method: original payment method | 'credit' | 'cash'. */
@@ -2084,6 +2114,17 @@ function refundTicket(ticketId, { lines, tipRefunded = 0, method, reason, note =
   t.refunded = Math.round(((t.refunded || 0) + amount) * 100) / 100; (t.refundIds ||= []).push(r.id); t.seeded = false;
   for (const l of lines) if (l.type === 'product' && !l.partial) { const p = prodById(l.refId); if (p) p.stock += l.qty; }
   if (method === 'credit') { const c = clientById(t.clientId); if (c) { c.storeCredit = Math.round(((c.storeCredit || 0) + amount) * 100) / 100; c.seeded = false; } }
+  // a gift card sold on this ticket and refunded can't be spent any more (only what's still on it can be refunded)
+  for (const l of lines) if (l.type === 'gift' && l.cardId) { const g = giftById(l.cardId); const v = g ? Math.min(l.amount, giftBalance(g)) : 0; if (v > 0.004) useGiftCard(g.id, { kind: 'void', amount: v, ticketId: t.id }); }
+  // refunded to the gift card that paid: the money goes back on that card, up to what it paid
+  if (method === 'gift') {
+    let left = amount; const uses = st().giftUses.filter((u) => u.ticketId === t.id);
+    for (const u of uses.filter((x) => x.kind === 'redeem')) {
+      const back = -sum(uses.filter((x) => x.kind === 'refund' && x.cardId === u.cardId), (x) => x.amount);
+      const put = Math.min(left, Math.round((u.amount - back) * 100) / 100); if (put <= 0.004) continue;
+      uses.push(useGiftCard(u.cardId, { kind: 'refund', amount: -put, ticketId: t.id })); left = Math.round((left - put) * 100) / 100; r.giftBack = Math.round(((r.giftBack || 0) + put) * 100) / 100;
+    }
+  }
   commit(); return r;
 }
 function ticketRefunds(t) { return st().refunds.filter((r) => r.ticketId === t.id); }
@@ -2116,9 +2157,10 @@ function makeSeededTicket(a) {
    - the iPad keeps a full local copy, so the calendar is instant and works offline;
    - local edits are pushed by diffing each record against what the cloud last confirmed (no edit can be missed);
    - cloud changes (online bookings, other devices) arrive by realtime, with a polling fallback;
-   - the database refuses double-bookings, and a refused edit is rolled back on screen with an explanation.
-   In the cloud for now: business, team, hours, services, clients (contact, profile, caution flags), appointments.
-   Still on this device only: health answers, notes, photos, forms, tickets — the next release moves them. */
+   - the database refuses double-bookings and overspent gift cards, and a refused edit is rolled back on screen with an explanation.
+   In the cloud: business, team, hours, services, clients, appointments, notes, forms (answers and health files through
+   audited functions), tickets, refunds, gift cards and their ledger. Still on this device only: photos, products and
+   stock, memberships, messages, waitlist. */
 const CLOUD_CFG = window.LUSTER_CONFIG || {};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
@@ -2262,12 +2304,32 @@ const Cloud = {
     return { ...(ex || {}), ...(r.data || {}), id: r.id, ticketId: r.ticket_id, clientId: r.client_id, staffId: r.staff_id ? this.keyOf('staff', r.staff_id) : ((ex && ex.staffId) || null),
       date: ymd(r.refunded_on), amount: r.amount_cents / 100, method: r.method, reason: r.reason, seeded: false };
   },
+  // a gift card is sent once; what it holds is worked out by the database from the ledger (never sent from here)
+  giftRow(g) {
+    return { id: g.id, business_id: this.L().businessId, code: g.code, amount_cents: Math.round((g.amount || 0) * 100), client_id: isUuid(g.clientId) ? g.clientId : null,
+      ticket_id: this.syncedRef('ticket', g.ticketId), issued_on: g.date || todayStr(), data: { recipient: g.recipient || null, note: g.note || null } };
+  },
+  giftFromRow(r, ex) {
+    return { ...(ex || {}), id: r.id, code: r.code, amount: r.amount_cents / 100, cloudBalance: r.balance_cents / 100, clientId: r.client_id || (ex && ex.clientId) || null,
+      ticketId: r.ticket_id || (ex && ex.ticketId) || null, date: ymd(r.issued_on), recipient: (r.data && r.data.recipient) || '', note: (r.data && r.data.note) || '', seeded: false };
+  },
+  giftUseRow(u) {
+    return { id: u.id, business_id: this.L().businessId, card_id: u.cardId, ticket_id: this.syncedRef('ticket', u.ticketId), kind: u.kind,
+      amount_cents: Math.round((u.amount || 0) * 100), used_on: u.date || todayStr(), data: { at: u.at || null } };
+  },
+  giftUseFromRow(r, ex) {
+    return { ...(ex || {}), id: r.id, cardId: r.card_id, ticketId: r.ticket_id || (ex && ex.ticketId) || null, kind: r.kind, amount: r.amount_cents / 100,
+      date: ymd(r.used_on), at: (r.data && r.data.at) || r.created_at, seeded: false };
+  },
   // what syncs, in dependency order (a row is pushed only after what it points at)
   kinds() {
     return [
       { kind: 'client', table: 'clients', list: () => st().clients, row: (x) => this.clientRow(x), from: (r, ex) => this.clientFromRow(r, ex) },
       { kind: 'appt', table: 'appointments', list: () => st().appointments.filter((a) => this.uuidOf('staff', a.staffId)), all: () => st().appointments, row: (x) => this.apptRow(x), from: (r, ex) => this.apptFromRow(r, ex) },
       { kind: 'ticket', table: 'tickets', list: () => st().tickets, row: (x) => this.ticketRow(x), from: (r, ex) => this.ticketFromRow(r, ex) },
+      { kind: 'gift', table: 'gift_cards', list: () => st().giftCards, row: (x) => this.giftRow(x), from: (r, ex) => this.giftFromRow(r, ex) },
+      // a use goes up after its card, and after the sale it belongs to (the ledger can't be corrected later)
+      { kind: 'giftUse', table: 'gift_card_uses', list: () => st().giftUses.filter((u) => this.L().synced.gift[u.cardId] && (!u.ticketId || this.L().synced.ticket[u.ticketId])), all: () => st().giftUses, row: (x) => this.giftUseRow(x), from: (r, ex) => this.giftUseFromRow(r, ex) },
       { kind: 'refund', table: 'refunds', list: () => st().refunds.filter((x) => this.L().synced.ticket[x.ticketId]), all: () => st().refunds, row: (x) => this.refundRow(x), from: (r, ex) => this.refundFromRow(r, ex) },
       { kind: 'note', table: 'notes', list: () => st().notes.filter((n) => this.L().synced.client[n.clientId]), all: () => st().notes, row: (x) => this.noteRow(x), from: (r, ex) => this.noteFromRow(r, ex) },
       { kind: 'form', table: 'forms', list: () => st().forms.filter((f) => this.L().synced.client[f.clientId]), all: () => st().forms, row: (x) => this.formRow(x), from: (r, ex) => this.formFromRow(r, ex) },
@@ -2380,7 +2442,7 @@ const Cloud = {
   err(error) { const e = new Error(error.message || 'Cloud error'); e.code = error.code; if (error.code === '42501' || error.code === 'PGRST301' || /JWT/i.test(error.message || '')) e.auth = true; return e; },
   async pull(full) {
     const sb = this.sb(); const L = this.L(); const biz = L.businessId;
-    for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
+    for (const k of ['client', 'appt', 'ticket', 'gift', 'giftUse', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
     if (full) { await this.pullCatalog(); await this.pullForms(); }
     const since = full ? null : L.lastPull;
     const overlap = (t) => new Date(Date.parse(t) - 120000).toISOString();   // rows can commit slightly out of timestamp order; re-reading two minutes is cheap and merges are idempotent
@@ -2418,7 +2480,7 @@ const Cloud = {
     if (k.kind === 'appt' && (!r.services || !r.services.length)) ensureBlockService();
     const next = k.from(r, local);
     if (local) Object.assign(local, next);
-    else ({ client: st().clients, appt: st().appointments, ticket: st().tickets, refund: st().refunds, note: st().notes, form: st().forms })[k.kind].push(next);
+    else ({ client: st().clients, appt: st().appointments, ticket: st().tickets, gift: st().giftCards, giftUse: st().giftUses, refund: st().refunds, note: st().notes, form: st().forms })[k.kind].push(next);
     map[r.id] = hashOf(k.row(local || next));
   },
   async pullCatalog() {
@@ -2471,7 +2533,7 @@ const Cloud = {
         L.catalogHash = hashOf([this.catalogPayload(), this.bizRow()]);
       }
     }
-    for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
+    for (const k of ['client', 'appt', 'ticket', 'gift', 'giftUse', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
     const ft = this.formTemplatesPayload(); const fth = hashOf(ft);
     if (fth !== L.formsHash) {
       const r = await sb.from('form_templates').upsert(ft, { onConflict: 'business_id,template_id' });
@@ -2552,6 +2614,7 @@ const Cloud = {
     if (pairs.length > 1) { for (const p of pairs) await this.pushRows(table, [p], map); return; }   // find the one bad row
     const [x] = pairs[0];
     if (error.code === '23P01' && table === 'appointments') return this.refused(x, map);
+    if (error.code === '23514' && table === 'gift_card_uses') return this.giftRefused(x, map, error);
     const e = this.err(error); if (e.auth || !error.code) throw e;   // signed out or offline: stop and retry later
     // one bad record must not hold up everything else: keep going, report it, retry it next sync
     (this.rowErrors ||= []).push(`${table}: ${error.message}`);
@@ -2564,6 +2627,22 @@ const Cloud = {
     if (data && data[0]) { delete map[a.id]; this.mergeAppt(data[0]); toast(`Change undone for ${esc(who)}: that time was just booked online.`, 'bad'); }
     else { const i = st().appointments.indexOf(a); if (i >= 0) st().appointments.splice(i, 1); delete map[a.id]; toast(`Couldn't book ${esc(who)}: that time was just booked online.`, 'bad'); }
     invalidateIndex(); await this.pull(false); this.repaint();
+  },
+  // The database refused a gift card use: the card didn't have that much left (another iPad spent it first, or this one
+  // was offline). The use comes off this iPad's ledger, the sale is marked as still owing that amount, and the desk is told.
+  giftRefused(u, map, error) {
+    const arr = st().giftUses; const i = arr.indexOf(u); if (i >= 0) arr.splice(i, 1); delete map[u.id];
+    const g = st().giftCards.find((x) => x.id === u.cardId); const t = st().tickets.find((x) => x.id === u.ticketId); const c = t && clientById(t.clientId);
+    const code = g ? g.code : 'A gift card';
+    if (u.kind === 'redeem') {
+      if (t) {
+        const p = (t.payments || []).find((x) => x.cardId === u.cardId && !x.declined && Math.abs(x.amount - u.amount) < 0.005); if (p) p.declined = true;
+        t.giftShort = Math.round(((t.giftShort || 0) + u.amount) * 100) / 100; t.seeded = false;
+      }
+      toast(`${esc(code)} didn't have ${money(u.amount)} left: it was spent on another iPad first.${c ? ` Collect ${money(u.amount)} from ${esc(fullName(c))} another way.` : ''}`, 'bad', t ? { label: 'Ticket', act: 'open-ticket', attrs: `data-id="${t.id}"` } : undefined);
+    } else toast(`Couldn't change ${esc(code)}: ${esc(error.message)}`, 'bad');
+    Diag.report('sync', `gift card use refused: ${error.message}`);
+    this.again = true;   // send the marked sale and pull the card's real balance
   },
   subscribe() {
     if (CLOUD_CFG.realtime === false) return;
@@ -2612,7 +2691,7 @@ function emptyLiveState(entry, from, ids) {
   for (const k of keep) if (base[k] !== undefined) st0[k] = copy(base[k]);
   if (!from) { st0.staff = []; st0.services = []; }
   st0.business = { ...st0.business, name: entry.name };
-  Object.assign(st0, { clients: [], appointments: [], notes: [], photos: [], forms: [], messages: [], waitlist: [], refunds: [], tickets: [], giftCards: [] });
+  Object.assign(st0, { clients: [], appointments: [], notes: [], photos: [], forms: [], messages: [], waitlist: [], refunds: [], tickets: [], giftCards: [], giftUses: [] });
   st0.staff.forEach((s) => { delete s.bias; });
   st0.live = { businessId: entry.live.businessId, slug: entry.live.slug, timezone: entry.live.timezone, ids: ids ? copy(ids) : { staff: {}, services: {} }, synced: { appt: {}, client: {} }, lastPull: null, lastSync: null, catalogHash: null };
   return st0;
@@ -2689,7 +2768,7 @@ function renderRail() {
     <div class="rail-foot">
       <span class="perf"><span class="perf-dot"></span>Rendered in <b id="perf-ms" class="num">${Math.max(1, Math.round(App.lastRenderMs))} ms</b></span>
       ${isLive() ? `${cloudStatusHtml()}<span>${esc(st().business.name)} · ${st().clients.length} clients · ${st().appointments.length} appointments</span>` : `<span>All data on this device. No spinners.</span>
-      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>`}
+      <span>Luster demo · ${st().clients.length} clients · ${st().appointments.length} appointments</span>${/^https?:$/.test(location.protocol) && window.top === window.self ? '<a href="welcome/">What is Luster? →</a>' : ''}`}
     </div>`;
 }
 function renderTabbar() {
@@ -3286,11 +3365,11 @@ Modals.ticket = ({ id }) => {
   const t = st().tickets.find((x) => x.id === id); if (!t) return { title: 'Ticket', body: '<p class="muted">No ticket on file for this visit.</p>' };
   const c = clientById(t.clientId);
   const refundable = t.total - (t.refunded || 0) > 0.004;
-  return { title: `Ticket · ${fmtDate(t.date)}${t.refunded ? ` · refunded ${money(t.refunded)}` : ''}`, body: receiptHtml(t, c), foot: `<button class="btn" data-act="close-modal">Close</button><button class="btn" data-act="receipt-send" data-id="${t.id}">Text receipt</button>${refundable ? `<button class="btn danger" data-act="refund-open" data-id="${t.id}">Refund…</button>` : '<span class="badge bad">Fully refunded</span>'}` };
+  return { title: `Ticket · ${fmtDate(t.date)}${t.refunded ? ` · refunded ${money(t.refunded)}` : ''}`, body: receiptHtml(t, c), foot: `<button class="btn" data-act="close-modal">Close</button>${t.giftShort ? `<button class="btn primary" data-act="short-pay" data-id="${t.id}">Record the ${money(t.giftShort)} owed</button>` : ''}<button class="btn" data-act="receipt-send" data-id="${t.id}">${isLive() ? 'Send receipt' : 'Text receipt'}</button>${refundable ? `<button class="btn danger" data-act="refund-open" data-id="${t.id}">Refund…</button>` : '<span class="badge bad">Fully refunded</span>'}` };
 };
 function receiptHtml(t, c) {
   const svc = sum(t.lines.filter((l) => l.type === 'service'), (l) => l.price * l.qty), prod = sum(t.lines.filter((l) => l.type !== 'service'), (l) => l.price * l.qty);
-  return `<div class="receipt"><div class="hd">${esc(st().business.name)}</div><div class="small muted" style="text-align:center">${esc(st().business.address)}<br>${fmtDate(t.date, 'long')} · ${new Date(t.closedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div><div class="dash"></div><div class="ln"><span>${esc(fullName(c))}</span><span class="muted">with ${esc(staffById(t.staffId)?.name.split(' ')[0] || '')}</span></div><div class="dash"></div>${t.lines.map((l) => `<div class="ln"><span>${esc(l.name)}${l.qty > 1 ? ` × ${l.qty}` : ''}${l.note ? ` <span class="muted small">· ${esc(l.note)}</span>` : ''}</span><span class="num">${money(l.price * l.qty)}</span></div>`).join('')}<div class="dash"></div>${t.discount ? `<div class="ln"><span>Discount</span><span class="num">−${money(t.discount)}</span></div>` : ''}${t.tax ? `<div class="ln"><span>Tax (retail)</span><span class="num">${money(t.tax)}</span></div>` : ''}${t.tip ? `<div class="ln"><span>Tip</span><span class="num">${money(t.tip)}</span></div>` : ''}<div class="ln strong" style="font-size:16px"><span>Total</span><span class="num">${money(t.total)}</span></div><div class="dash"></div>${t.payments.map((p) => `<div class="ln small muted"><span>${PAY_LABEL[p.method] || p.method}${p.last4 ? ` •••• ${p.last4}` : ''}</span><span class="num">${money(p.amount)}</span></div>`).join('')}${ticketRefunds(t).length ? `<div class="dash"></div>${ticketRefunds(t).map((r) => `<div class="ln" style="color:var(--bad-ink)"><span>Refund · ${esc(r.reason)} · ${fmtDate(r.date, 'short')} · ${r.method === 'credit' ? 'store credit' : PAY_LABEL[r.method] || r.method}${r.note ? ` <span class="small">· ${esc(r.note)}</span>` : ''}</span><span class="num">−${money(r.amount)}</span></div>`).join('')}` : ''}<div class="small muted" style="text-align:center;margin-top:8px">Thank you — see you next time. Services ${money(svc)} · Retail ${money(prod)}</div></div>`;
+  return `<div class="receipt"><div class="hd">${esc(st().business.name)}</div><div class="small muted" style="text-align:center">${esc(st().business.address)}<br>${fmtDate(t.date, 'long')} · ${new Date(t.closedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div><div class="dash"></div><div class="ln"><span>${esc(fullName(c))}</span><span class="muted">with ${esc(staffById(t.staffId)?.name.split(' ')[0] || '')}</span></div><div class="dash"></div>${t.lines.map((l) => `<div class="ln"><span>${esc(l.name)}${l.qty > 1 ? ` × ${l.qty}` : ''}${l.code ? ` <span class="muted small">· ${esc(l.code)}</span>` : ''}${l.note ? ` <span class="muted small">· ${esc(l.note)}</span>` : ''}</span><span class="num">${money(l.price * l.qty)}</span></div>`).join('')}<div class="dash"></div>${t.discount ? `<div class="ln"><span>Discount</span><span class="num">−${money(t.discount)}</span></div>` : ''}${t.tax ? `<div class="ln"><span>Tax (retail)</span><span class="num">${money(t.tax)}</span></div>` : ''}${t.tip ? `<div class="ln"><span>Tip</span><span class="num">${money(t.tip)}</span></div>` : ''}<div class="ln strong" style="font-size:16px"><span>Total</span><span class="num">${money(t.total)}</span></div><div class="dash"></div>${t.payments.map((p) => `<div class="ln small muted"><span>${PAY_LABEL[p.method] || p.method}${p.last4 ? ` •••• ${p.last4}` : ''}${p.declined ? ' · declined' : ''}</span><span class="num">${p.declined ? `<s>${money(p.amount)}</s>` : money(p.amount)}</span></div>`).join('')}${t.giftShort ? `<div class="ln" style="color:var(--bad-ink)"><span>Gift card came up short (spent on another iPad) · still owed</span><span class="num">${money(t.giftShort)}</span></div>` : ''}${ticketRefunds(t).length ? `<div class="dash"></div>${ticketRefunds(t).map((r) => `<div class="ln" style="color:var(--bad-ink)"><span>Refund · ${esc(r.reason)} · ${fmtDate(r.date, 'short')} · ${r.method === 'credit' ? 'store credit' : PAY_LABEL[r.method] || r.method}${r.note ? ` <span class="small">· ${esc(r.note)}</span>` : ''}</span><span class="num">−${money(r.amount)}</span></div>`).join('')}` : ''}<div class="small muted" style="text-align:center;margin-top:8px">Thank you — see you next time. Services ${money(svc)} · Retail ${money(prod)}</div></div>`;
 }
 const PAY_LABEL = { card: 'Card (tap)', card_on_file: 'Card on file', cash: 'Cash', gift: 'Gift card', split: 'Split', membership: 'Membership', credit: 'Store credit' };
 
@@ -3371,12 +3450,12 @@ function openTicketsHtml() {
   const closed = st().tickets.filter((t) => t.date === today).sort(by((t) => t.closedAt)).reverse();
   return `<div class="col" style="gap:20px">
     <div><div class="card-head"><h3>Ready to check out</h3><span class="small muted">${open.length} on today's book</span></div>${open.length ? `<div class="open-appts">${open.map((a) => { const c = clientById(a.clientId); return `<button class="open-appt" data-act="checkout-appt" data-id="${a.id}">${avatar(c)}<div class="grow" style="min-width:0;text-align:left"><div class="strong ellipsis">${esc(fullName(c))}</div><div class="small muted ellipsis">${fmtTime(a.start)} · ${esc(apptTitle(a))}</div><div style="margin-top:4px">${statusBadge(a.status)}</div></div><span class="num strong">${money(sum(a.items, (i) => i.price), { whole: true })}</span></button>`; }).join('')}</div>` : '<div class="empty">Everyone is checked out. Nice.</div>'}</div>
-    <div class="grid-2"><div class="card pad"><h3 style="margin-bottom:8px">Walk-in or retail only</h3><div class="search">${I.search}<input id="co-q" placeholder="Find a client…" data-on-input="co-q" autocomplete="off"></div><div class="list" id="co-results" style="margin-top:6px"></div><button class="btn sm ghost" style="margin-top:6px" data-act="new-client">${I.plus}New client</button></div>
-    <div class="card pad"><h3 style="margin-bottom:8px">Closed today</h3>${closed.length ? `<div class="list">${closed.slice(0, 8).map((t) => `<div class="list-row click" data-act="open-ticket" data-id="${t.id}"><div class="grow"><div class="strong">${esc(fullName(clientById(t.clientId)))}</div><div class="small muted ellipsis">${t.lines.map((l) => esc(l.name)).join(', ')}</div></div><div class="col" style="align-items:flex-end;gap:0"><span class="num strong">${money(t.total)}</span><span class="tiny faint">${PAY_LABEL[t.payments[0]?.method] || ''}${t.tip ? ` · tip ${money(t.tip, { whole: true })}` : ''}</span>${t.refunded ? `<span class="badge bad" style="margin-top:2px">Refunded ${money(t.refunded)}</span>` : ''}</div></div>`).join('')}</div><div class="row between small" style="padding-top:10px;border-top:1px solid var(--line-2);margin-top:6px"><span class="muted">Today so far</span><span class="num strong">${money(sum(closed, (t) => t.total))} · ${closed.length} tickets</span></div>${(() => { const rs = st().refunds.filter((r) => r.date === today); return rs.length ? `<div class="row between small"><span class="muted">Refunds today</span><span class="num" style="color:var(--bad-ink)">−${money(sum(rs, (r) => r.amount))} · ${rs.length}</span></div>` : ''; })()}<div class="row" style="margin-top:8px"><button class="btn sm" data-act="refunds-list">All refunds</button></div>` : '<div class="small muted">No tickets closed yet today.</div>'}</div></div></div>`;
+    <div class="grid-2"><div class="card pad"><h3 style="margin-bottom:8px">Walk-in or retail only</h3><div class="search">${I.search}<input id="co-q" placeholder="Find a client…" data-on-input="co-q" autocomplete="off"></div><div class="list" id="co-results" style="margin-top:6px"></div><div class="row wrap" style="margin-top:6px;gap:6px"><button class="btn sm ghost" data-act="new-client">${I.plus}New client</button><button class="btn sm ghost" data-act="gift-lookup">${I.search}Gift card balance</button></div></div>
+    <div class="card pad"><h3 style="margin-bottom:8px">Closed today</h3>${closed.length ? `<div class="list">${closed.slice(0, 8).map((t) => `<div class="list-row click" data-act="open-ticket" data-id="${t.id}"><div class="grow"><div class="strong">${esc(fullName(clientById(t.clientId)))}</div><div class="small muted ellipsis">${t.lines.map((l) => esc(l.name)).join(', ')}</div></div><div class="col" style="align-items:flex-end;gap:0"><span class="num strong">${money(t.total)}</span><span class="tiny faint">${PAY_LABEL[t.payments[0]?.method] || ''}${t.tip ? ` · tip ${money(t.tip, { whole: true })}` : ''}</span>${t.refunded ? `<span class="badge bad" style="margin-top:2px">Refunded ${money(t.refunded)}</span>` : ''}${t.giftShort ? `<span class="badge bad" style="margin-top:2px">Still owed ${money(t.giftShort)}</span>` : ''}</div></div>`).join('')}</div><div class="row between small" style="padding-top:10px;border-top:1px solid var(--line-2);margin-top:6px"><span class="muted">Today so far</span><span class="num strong">${money(sum(closed, (t) => t.total))} · ${closed.length} tickets</span></div>${(() => { const rs = st().refunds.filter((r) => r.date === today); return rs.length ? `<div class="row between small"><span class="muted">Refunds today</span><span class="num" style="color:var(--bad-ink)">−${money(sum(rs, (r) => r.amount))} · ${rs.length}</span></div>` : ''; })()}<div class="row" style="margin-top:8px"><button class="btn sm" data-act="refunds-list">All refunds</button></div>` : '<div class="small muted">No tickets closed yet today.</div>'}</div></div></div>`;
 }
 Views.checkout = {
   title: () => S.ui.ticket ? `Checkout · ${fullName(clientById(S.ui.ticket.clientId))}` : 'Checkout',
-  sub: () => S.ui.ticket ? (S.ui.ticket.appointmentId ? `${apptTitle(apptById(S.ui.ticket.appointmentId))} with ${staffById(S.ui.ticket.staffId).name.split(' ')[0]}` : 'Walk-in ticket') : 'Tap a client to start a ticket. Payments are simulated in this demo.',
+  sub: () => S.ui.ticket ? (S.ui.ticket.appointmentId ? `${apptTitle(apptById(S.ui.ticket.appointmentId))} with ${staffById(S.ui.ticket.staffId).name.split(' ')[0]}` : 'Walk-in ticket') : isLive() ? 'Tap a client to start a ticket. Cards run on your own terminal; Luster records the payment.' : 'Tap a client to start a ticket. Payments are simulated in this demo.',
   actions: () => S.ui.ticket ? `<button class="btn" data-act="ticket-park">Park ticket</button><button class="btn danger" data-act="ticket-void">Void</button>` : '',
   render() { return S.ui.ticket ? checkoutHtml(S.ui.ticket) : openTicketsHtml(); },
   mount(root) { const q = $('#co-q', root); if (q) { const r = $('#co-results', root); r.innerHTML = ''; } },
@@ -3386,7 +3465,7 @@ function checkoutHtml(t) {
   const tab = S.ui.coTab || 'services';
   const catalog = tab === 'services' ? CAT_ORDER.map((k) => `<div class="svc-group"><h3>${CATEGORIES[k].label}</h3><div class="catalog-grid">${(grouped[k] || []).map((s) => `<button class="cat-item" data-act="ticket-add" data-type="service" data-id="${s.id}"><b class="ellipsis">${esc(s.name)}</b><span>${fmtDur(s.dur)} · ${money(s.price, { whole: true })}${t.plan && t.plan.includes.includes(s.id) ? ' · member' : ''}</span></button>`).join('')}</div></div>`).join('')
     : tab === 'retail' ? `<div class="catalog-grid">${st().products.map((p) => `<button class="cat-item" data-act="ticket-add" data-type="product" data-id="${p.id}"><b class="ellipsis">${esc(p.name)}</b><span>${money(p.price, { whole: true })}${t.plan ? ` · member ${money(p.price * (1 - t.plan.retailDiscount), { whole: true })}` : ''} · ${p.stock} in stock${p.stock <= 3 ? ' · low' : ''}</span></button>`).join('')}</div>`
-    : `<div class="catalog-grid">${[25, 50, 75, 100, 150, 200].map((v) => `<button class="cat-item" data-act="ticket-add" data-type="gift" data-id="${v}"><b>Gift card ${money(v, { whole: true })}</b><span>Printed or texted code</span></button>`).join('')}</div>`;
+    : `<div class="catalog-grid">${[25, 50, 75, 100, 150, 200].map((v) => `<button class="cat-item" data-act="ticket-add" data-type="gift" data-id="${v}"><b>Gift card ${money(v, { whole: true })}</b><span>Code on the receipt</span></button>`).join('')}<button class="cat-item" data-act="gift-other"><b>Other amount</b><span>$5 to $2,000</span></button></div><div class="small muted" style="margin-top:10px">Each card gets its own code when the ticket closes${isLive() ? ', and works on every iPad in the studio' : ''}.</div>`;
   return `<div class="checkout">
     <div class="catalog"><div class="row wrap"><div class="seg"><button class="btn ${tab === 'services' ? 'on' : ''}" data-act="co-tab" data-id="services">Services</button><button class="btn ${tab === 'retail' ? 'on' : ''}" data-act="co-tab" data-id="retail">Retail</button><button class="btn ${tab === 'gift' ? 'on' : ''}" data-act="co-tab" data-id="gift">Gift cards</button></div></div>${catalog}</div>
     <div class="ticket card pad">
@@ -3405,16 +3484,43 @@ function startTicket(opts) { S.ui.ticket = newTicket(opts); S.ui.coTab = 'servic
 
 Modals.terminal = ({ amount }) => ({ title: 'Card reader', body: `<div class="terminal"><div class="card-anim"></div><div class="strong" style="font-size:22px">${money(amount)}</div><div class="muted" id="terminal-msg">Tap, insert or swipe…</div><div class="tiny faint">Demo: this approves itself in a moment. In production this is your Stripe or Square reader.</div></div>`, foot: `<button class="btn" data-act="close-modal">Cancel</button>`, mount() { setTimeout(() => { const m = $('#terminal-msg'); if (!m) return; m.textContent = 'Approved · Visa •••• 4242'; m.style.color = 'var(--good-ink)'; setTimeout(() => { if (!S.ui.ticket) return; addPayment('card', amount, '4242'); }, 650); }, 1500); } });
 Modals.cash = ({ amount }) => ({ title: 'Cash', body: `<div class="strong" style="font-size:22px">Due ${money(amount)}</div><div class="field"><label for="cash-tendered">Tendered</label><input class="input" type="number" step="0.01" inputmode="decimal" id="cash-tendered" value="${amount.toFixed(2)}" data-on-input="cash-tendered" data-due="${amount}"></div><div class="row wrap">${[amount, 20, 40, 50, 100].filter((v, i, a) => v >= amount && a.indexOf(v) === i).map((v) => `<button class="chip" data-act="cash-quick" data-v="${v}">${money(v, { whole: v !== amount })}</button>`).join('')}</div><div class="strong" id="cash-change">Change due: ${money(0)}</div>`, foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="cash-done" data-amount="${amount}">Record cash</button>` });
-Modals.gift = ({ amount }) => ({ title: 'Gift card', body: `<div class="field"><label for="gift-code">Code</label><input class="input" id="gift-code" placeholder="GLOW-0000" value="${isLive() ? '' : 'GLOW-2048'}" autocapitalize="characters"></div>${isLive() ? '<div class="small muted">Gift card balances are kept on this iPad for now.</div>' : `<div class="small muted">Demo cards: ${st().giftCards.map((g) => `<b>${g.code}</b> (${money(g.balance, { whole: true })})`).join(' · ')}</div>`}`, foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="gift-apply" data-amount="${amount}">Apply</button>` });
+Modals.gift = ({ amount }) => ({ title: 'Gift card', body: `<div class="field"><label for="gift-code">Code</label><input class="input" id="gift-code" placeholder="ABCD-2345" value="${isLive() ? '' : 'GLOW-2048'}" autocapitalize="characters" autocomplete="off" spellcheck="false"></div>${isLive() ? '<div class="small muted">Checked with the cloud first, so a card sold on another iPad works here too.</div>' : `<div class="small muted">Demo cards: ${st().giftCards.filter((g) => giftBalance(g) > 0).slice(0, 4).map((g) => `<b>${esc(g.code)}</b> (${money(giftBalance(g), { whole: giftBalance(g) % 1 === 0 })})`).join(' · ') || 'none left'}</div>`}`, foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="gift-apply" data-amount="${amount}">Apply</button>`, mount(root) { const i = $('#gift-code', root); if (i && !i.value) setTimeout(() => i.focus(), 30); } });
+// a gift card that came up short after the sale closed (another iPad spent it first): the rest is taken another way
+Modals.shortPay = ({ id }) => { const t = st().tickets.find((x) => x.id === id); const c = t && clientById(t.clientId); if (!t) return { title: 'Ticket', body: '<p class="muted">Not found.</p>', foot: '<button class="btn" data-act="close-modal">Close</button>' };
+  return { title: `Collect ${money(t.giftShort)}${c ? ` from ${esc(c.first)}` : ''}`, body: `<p>The gift card on this ticket had already been spent on another iPad, so ${money(t.giftShort)} is still owed. Take it another way and record it here.</p>${isLive() ? '<div class="small muted">Run a card on your terminal first: Luster records it, it doesn\'t charge it.</div>' : ''}`,
+    foot: `<button class="btn" data-act="close-modal">Not now</button><button class="btn" data-act="short-paid" data-id="${t.id}" data-m="cash">Paid in cash</button><button class="btn primary" data-act="short-paid" data-id="${t.id}" data-m="card">Paid by card</button>` }; };
+Modals.giftAmount = () => ({ title: 'Gift card amount', body: `<div class="field"><label for="gift-amt">Amount</label><input class="input" id="gift-amt" type="number" min="5" max="2000" step="1" inputmode="decimal" placeholder="250"></div>`, foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="gift-other-add">Add to ticket</button>`, mount(root) { setTimeout(() => $('#gift-amt', root)?.focus(), 30); } });
+const GIFT_KIND = { redeem: 'Spent', refund: 'Refunded back', void: 'Voided' };
+// one card's balance and history, or the cards sold most recently
+function giftLookupHtml(code) {
+  const g = giftByCode(code);
+  if (!g) {
+    if (normGift(code).length >= 4) return `<div class="empty" style="padding:14px">No gift card with that code${isLive() && Cloud.status !== 'ok' ? ' on this iPad, and the cloud can\'t be reached to check' : ''}.</div>`;
+    const recent = st().giftCards.slice().sort(by((x) => x.date || '')).reverse().slice(0, 6);
+    return recent.length ? `<div class="small muted" style="margin:4px 0 6px">Sold most recently</div><div class="list">${recent.map((x) => `<div class="list-row click" data-act="gift-lookup-pick" data-code="${esc(x.code)}"><div class="grow"><div class="strong gift-code sm">${esc(x.code)}</div><div class="tiny faint">${x.date ? fmtDate(x.date, 'short') : ''}${clientById(x.clientId) ? ` · ${esc(fullName(clientById(x.clientId)))}` : ''}</div></div><span class="num">${money(giftBalance(x))} <span class="faint">of ${money(x.amount, { whole: x.amount % 1 === 0 })}</span></span></div>`).join('')}</div>` : '<div class="small muted">No gift cards sold yet.</div>';
+  }
+  const bal = giftBalance(g); const c = clientById(g.clientId); const uses = giftUsesOf(g).slice().sort(by((u) => (u.date || '') + (u.at || '')));
+  return `<div class="row between" style="align-items:flex-end"><div><div class="gift-code">${esc(g.code)}</div><div class="small muted">Sold ${g.date ? fmtDate(g.date, 'long') : ''}${c ? ` to ${esc(fullName(c))}` : ''} · ${money(g.amount)}</div></div><div style="text-align:right"><div class="strong num" style="font-size:22px">${money(bal)}</div><div class="tiny faint">left on it</div></div></div>
+    ${uses.length ? `<table class="table" style="margin-top:10px"><tbody>${uses.map((u) => `<tr${u.ticketId ? ` class="click" data-act="open-ticket" data-id="${u.ticketId}"` : ''}><td class="small muted">${u.date ? fmtDate(u.date, 'short') : ''}</td><td class="small">${GIFT_KIND[u.kind] || u.kind}</td><td class="r num">${u.amount > 0 ? '−' : '+'}${money(Math.abs(u.amount))}</td></tr>`).join('')}</tbody></table>` : '<div class="small muted" style="margin-top:8px">Not used yet.</div>'}`;
+}
+Modals.giftLookup = ({ code = '' } = {}) => {
+  const open = st().giftCards.filter((g) => giftBalance(g) > 0.004);
+  return { title: 'Gift card balance', body: `<div class="field"><label for="gl-code">Code</label><input class="input" id="gl-code" placeholder="ABCD-2345" value="${esc(code)}" autocapitalize="characters" autocomplete="off" spellcheck="false" data-on-input="gift-lookup-q"></div><div id="gl-result">${giftLookupHtml(code)}</div><div class="small muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line-2)">Still to be spent: <b class="num">${money(sum(open, giftBalance))}</b> on ${open.length} card${open.length === 1 ? '' : 's'}</div>`,
+    foot: '<button class="btn" data-act="close-modal">Close</button>',
+    mount(root) { setTimeout(() => $('#gl-code', root)?.focus(), 30); if (isLive() && Cloud.user) Cloud.sync().then(() => { const i = $('#gl-code'); const r = $('#gl-result'); if (i && r && S.ui.modal && S.ui.modal.kind === 'giftLookup') r.innerHTML = giftLookupHtml(i.value); }, () => {}); } };
+};
 Modals.receipt = ({ ticketId }) => {
   const t = st().tickets.find((x) => x.id === ticketId); const c = clientById(t.clientId); const next = clientStats(c.id).next;
   const svcIds = t.lines.filter((l) => l.type === 'service').map((l) => l.refId);
-  return { title: 'Paid', body: `<div class="confirm-tick">${I.check}</div><div style="text-align:center"><div class="strong" style="font-size:22px">${money(t.total)}</div><div class="muted small">${esc(fullName(c))} · ${PAY_LABEL[t.payments[0]?.method]}${t.payments.length > 1 ? ' + ' + PAY_LABEL[t.payments[1]?.method] : ''}</div></div>${next ? `<div class="alert good">${I.calendar}<div>Already rebooked: ${fmtDate(next.date, 'dow')} at ${fmtTime(next.start)}.</div></div>` : `<div class="alert info">${I.repeat}<div><b>Rebook before they leave.</b> Clients who rebook at checkout come back 2× as often. Same services, 4 weeks out, with ${esc(staffById(t.staffId).name.split(' ')[0])}.</div></div>`}<details><summary class="small muted" style="cursor:pointer">Receipt</summary>${receiptHtml(t, c)}</details>`, foot: `<button class="btn" data-act="receipt-send" data-id="${t.id}">${isLive() ? 'Send receipt' : 'Text receipt'}</button>${next ? '' : `<button class="btn primary" data-act="rebook-from-ticket" data-client="${c.id}" data-staff="${t.staffId}" data-svcs="${svcIds.join(',')}">${I.repeat}Rebook 4 weeks out</button>`}<button class="btn ${next ? 'primary' : ''}" data-act="receipt-done">Done</button>` };
+  const sold = t.lines.filter((l) => l.type === 'gift' && l.code);
+  const giftBox = sold.length ? `<div class="alert info gift-codes">${I.spark}<div class="grow"><b>${sold.length > 1 ? 'Gift card codes' : 'Gift card code'}</b>${sold.map((l) => `<div class="row between" style="margin-top:4px"><span class="gift-code">${esc(l.code)}</span><span class="num strong">${money(l.price * (l.qty || 1))}</span></div>`).join('')}<div class="tiny faint" style="margin-top:4px">Write it on the card or send it to them. Anyone with the code can spend it.</div></div></div>` : '';
+  return { title: 'Paid', body: `<div class="confirm-tick">${I.check}</div><div style="text-align:center"><div class="strong" style="font-size:22px">${money(t.total)}</div><div class="muted small">${esc(fullName(c))} · ${PAY_LABEL[t.payments[0]?.method]}${t.payments.length > 1 ? ' + ' + PAY_LABEL[t.payments[1]?.method] : ''}</div></div>${giftBox}${next ? `<div class="alert good">${I.calendar}<div>Already rebooked: ${fmtDate(next.date, 'dow')} at ${fmtTime(next.start)}.</div></div>` : `<div class="alert info">${I.repeat}<div><b>Rebook before they leave.</b> Clients who rebook at checkout come back 2× as often. Same services, 4 weeks out, with ${esc(staffById(t.staffId).name.split(' ')[0])}.</div></div>`}<details><summary class="small muted" style="cursor:pointer">Receipt</summary>${receiptHtml(t, c)}</details>`, foot: `${sold.length ? `<button class="btn" data-act="gift-send" data-id="${t.id}">Send gift code</button>` : ''}<button class="btn" data-act="receipt-send" data-id="${t.id}">${isLive() ? 'Send receipt' : 'Text receipt'}</button>${next ? '' : `<button class="btn primary" data-act="rebook-from-ticket" data-client="${c.id}" data-staff="${t.staffId}" data-svcs="${svcIds.join(',')}">${I.repeat}Rebook 4 weeks out</button>`}<button class="btn ${next ? 'primary' : ''}" data-act="receipt-done">Done</button>` };
 };
-function addPayment(method, amount, last4) {
-  const t = S.ui.ticket; if (!t) return; t.payments.push({ method, amount: Math.round(amount * 100) / 100, last4: last4 || null }); closeModal();
+function addPayment(method, amount, last4, extra = {}) {
+  const t = S.ui.ticket; if (!t) return; const { note, ...more } = extra;
+  t.payments.push({ method, amount: Math.round(amount * 100) / 100, last4: last4 || null, ...more }); closeModal();
   const tot = ticketTotals(t);
-  if (tot.due <= 0.004) finishTicket(); else { rerenderContent(); toast(`${money(amount)} ${PAY_LABEL[method]} recorded · ${money(tot.due)} remaining`); }
+  if (tot.due <= 0.004) { finishTicket(); if (note) toast(note); } else { rerenderContent(); toast(`${money(amount)} ${PAY_LABEL[method]} recorded${note ? ` · ${note}` : ''} · ${money(tot.due)} remaining`); }
 }
 function finishTicket() {
   const t = S.ui.ticket; const tot = ticketTotals(t);
@@ -3443,7 +3549,40 @@ Object.assign(Actions, {
   'input:cash-tendered': (el) => { const v = parseFloat(el.value) || 0; const due = parseFloat(el.dataset.due); $('#cash-change').textContent = `Change due: ${money(Math.max(0, v - due))}`; },
   'cash-quick': (el) => { const i = $('#cash-tendered'); i.value = (+el.dataset.v).toFixed(2); i.dispatchEvent(new Event('input', { bubbles: true })); },
   'cash-done': (el) => { const due = parseFloat(el.dataset.amount); const v = parseFloat($('#cash-tendered').value) || 0; if (v < due) { addPayment('cash', v); } else addPayment('cash', due); },
-  'gift-apply': (el) => { const code = $('#gift-code').value.trim().toUpperCase(); const g = st().giftCards.find((x) => x.code === code); if (!g || g.balance <= 0) return toast('Card not found or empty', 'bad'); const due = parseFloat(el.dataset.amount); const use = Math.min(g.balance, due); g.balance -= use; commit(); addPayment('gift', use, code.slice(-4)); },
+  'gift-apply': async (el) => {
+    const code = ($('#gift-code') || {}).value || ''; if (!normGift(code)) return toast('Type the code from the card', 'bad');
+    const reset = () => { if (el.isConnected) { el.disabled = false; el.textContent = 'Apply'; } };
+    if (isLive() && Cloud.user) { el.disabled = true; el.textContent = 'Checking…'; try { await Cloud.sync(); } catch (e) {} reset(); if (!S.ui.ticket) return; }
+    const g = giftByCode(code);
+    if (!g) return toast(isLive() && Cloud.status !== 'ok' ? 'That card isn\'t on this iPad, and the cloud can\'t be reached to check. Try again once you\'re online.' : 'No gift card with that code', 'bad');
+    const t = S.ui.ticket; if (!t) return closeModal();
+    const left = Math.round((giftBalance(g) - sum(t.payments.filter((p) => p.cardId === g.id), (p) => p.amount)) * 100) / 100;
+    if (left <= 0.004) return toast(`${esc(g.code)} has nothing left on it`, 'bad');
+    const use = Math.min(left, parseFloat(el.dataset.amount));
+    addPayment('gift', use, g.code.slice(-4), { cardId: g.id, code: g.code, note: `${money(Math.round((left - use) * 100) / 100)} left on ${esc(g.code)}` });
+  },
+  'gift-other': () => openModal('giftAmount'),
+  'short-pay': (el) => openModal('shortPay', { id: el.dataset.id }),
+  'short-paid': (el) => {
+    const t = st().tickets.find((x) => x.id === el.dataset.id); if (!t || !t.giftShort) return closeModal();
+    const amt = t.giftShort; t.payments.push({ method: el.dataset.m, amount: amt, last4: null, late: true }); t.giftShort = 0; t.seeded = false; commit(); closeModal(); rerenderContent();
+    toast(`${money(amt)} ${el.dataset.m === 'cash' ? 'cash' : 'card'} recorded on the ticket`);
+  },
+  'gift-other-add': () => {
+    const v = Math.round((parseFloat(($('#gift-amt') || {}).value) || 0) * 100) / 100; if (v < 5 || v > 2000) return toast('Pick an amount from $5 to $2,000', 'bad');
+    const t = S.ui.ticket; closeModal(); if (!t) return;
+    t.lines.push({ id: uid('l'), type: 'gift', refId: 'gift', name: `Gift card ${money(v, { whole: v % 1 === 0 })}`, price: v, qty: 1, staffId: t.staffId, note: '' }); rerenderContent();
+  },
+  'gift-lookup': () => openModal('giftLookup', {}),
+  'gift-lookup-pick': (el) => { const i = $('#gl-code'); if (i) { i.value = el.dataset.code; $('#gl-result').innerHTML = giftLookupHtml(i.value); } },
+  'input:gift-lookup-q': (el) => { const r = $('#gl-result'); if (r) r.innerHTML = giftLookupHtml(el.value); },
+  'gift-send': (el) => {
+    const t = st().tickets.find((x) => x.id === el.dataset.id); if (!t) return; const c = clientById(t.clientId); if (!c) return toast('No client on this ticket', 'bad');
+    const b = st().business; const sold = t.lines.filter((l) => l.type === 'gift' && l.code);
+    const body = `Hi ${c.first}, here's your ${b.name} gift card${sold.length > 1 ? 's' : ''}: ${sold.map((l) => `${l.code} (${money(l.price * (l.qty || 1))})`).join(', ')}. Show the code at checkout to use it.${b.phone ? ` Questions? ${fmtPhone(b.phone)}` : ''}`;
+    if (isLive()) { closeModal(); return outgoing({ clientId: c.id, kind: 'gift', subject: `Your ${b.name} gift card`, body }); }
+    sendMessage(c.id, body, 'gift'); toast('Gift card code texted (simulated)');
+  },
   'ticket-close': () => finishTicket(),
   'receipt-done': () => { closeModal(); rerenderContent(); },
   'rebook-from-ticket': (el) => { closeModal(); const date = addDays(todayStr(), 28); S.ui.draft = newDraft({ clientId: el.dataset.client, staffId: el.dataset.staff, date, serviceIds: el.dataset.svcs.split(',').filter(Boolean) }); const slots = freeSlots(S.ui.draft.staffId, date, draftDur(S.ui.draft)); S.ui.draft.start = slots[Math.floor(slots.length / 3)] ?? slots[0] ?? null; openDrawer('appt-form'); },
@@ -3456,13 +3595,13 @@ Modals.refund = ({ id }) => {
   const t = st().tickets.find((x) => x.id === id); const c = clientById(t.clientId); const already = t.refunded || 0; const maxLeft = Math.round((t.total - already) * 100) / 100;
   const orig = t.payments[0]?.method || 'card';
   return { title: `Refund · ${esc(fullName(c))}`, body: `<div class="small muted">Ticket from ${fmtDate(t.date, 'long')} · paid ${money(t.total)} by ${PAY_LABEL[orig] || orig}${already ? ` · ${money(already)} already refunded` : ''}</div>
-    <div class="field"><label>What's being refunded</label><div class="col" style="gap:6px">${t.lines.map((l, i) => `<label class="check" style="justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 10px"><span class="row"><input type="checkbox" data-rl="${i}" data-amount="${(l.price * l.qty).toFixed(2)}" data-tax="${l.type === 'product' ? (l.price * l.qty * st().business.taxRate).toFixed(2) : '0'}"> <span><b>${esc(l.name)}</b>${l.qty > 1 ? ` × ${l.qty}` : ''}<span class="small muted"> · ${l.type === 'service' ? esc(staffById(l.staffId)?.name.split(' ')[0] || '') : l.type === 'product' ? 'retail, tax refunded too' : 'gift card'}</span></span></span><span class="row"><input class="input num" type="number" step="0.01" min="0" max="${(l.price * l.qty).toFixed(2)}" value="${(l.price * l.qty).toFixed(2)}" data-rlamt="${i}" style="width:96px;text-align:right;min-height:30px;padding:4px 8px" aria-label="Amount"></span></label>`).join('')}${t.tip ? `<label class="check" style="justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 10px"><span class="row"><input type="checkbox" id="rf-tip" data-amount="${t.tip.toFixed(2)}"> <span><b>Tip</b><span class="small muted"> · comes out of ${esc(staffById(t.staffId)?.name.split(' ')[0] || '')}'s payout</span></span></span><span class="num">${money(t.tip)}</span></label>` : ''}</div></div>
+    <div class="field"><label>What's being refunded</label><div class="col" style="gap:6px">${t.lines.map((l, i) => { const g = l.type === 'gift' && l.cardId ? giftById(l.cardId) : null; const cap = Math.min(l.price * l.qty, g ? giftBalance(g) : Infinity); return `<label class="check" style="justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 10px"><span class="row"><input type="checkbox" data-rl="${i}" data-amount="${(l.price * l.qty).toFixed(2)}" data-cap="${cap.toFixed(2)}" data-tax="${l.type === 'product' ? (l.price * l.qty * st().business.taxRate).toFixed(2) : '0'}"${cap <= 0.004 ? ' disabled' : ''}> <span><b>${esc(l.name)}</b>${l.qty > 1 ? ` × ${l.qty}` : ''}<span class="small muted"> · ${l.type === 'service' ? esc(staffById(l.staffId)?.name.split(' ')[0] || '') : l.type === 'product' ? 'retail, tax refunded too' : g ? `${esc(g.code)}, ${cap > 0.004 ? `${money(cap)} not spent yet` : 'already spent'}` : 'gift card'}</span></span></span><span class="row"><input class="input num" type="number" step="0.01" min="0" max="${cap.toFixed(2)}" value="${cap.toFixed(2)}" data-rlamt="${i}" style="width:96px;text-align:right;min-height:30px;padding:4px 8px" aria-label="Amount"></span></label>`; }).join('')}${t.tip ? `<label class="check" style="justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 10px"><span class="row"><input type="checkbox" id="rf-tip" data-amount="${t.tip.toFixed(2)}"> <span><b>Tip</b><span class="small muted"> · comes out of ${esc(staffById(t.staffId)?.name.split(' ')[0] || '')}'s payout</span></span></span><span class="num">${money(t.tip)}</span></label>` : ''}</div></div>
     <div class="field-row"><div class="field"><label for="rf-reason">Reason</label><select class="select" id="rf-reason">${REFUND_REASONS.map((r) => `<option>${r}</option>`).join('')}</select></div><div class="field"><label for="rf-method">Refund to</label><select class="select" id="rf-method"><option value="${orig}">${PAY_LABEL[orig] || orig}${t.payments[0]?.last4 ? ` •••• ${t.payments[0].last4}` : ''} (original)</option><option value="credit">Store credit (instant, keeps the money in the studio)</option>${orig !== 'cash' ? '<option value="cash">Cash from the drawer</option>' : ''}</select></div></div>
     <div class="field"><label for="rf-note">Note for the file</label><input class="input" id="rf-note" placeholder="What happened, who approved it"></div>
     <div class="row between" style="padding:10px 12px;background:var(--surface-2);border-radius:var(--r-sm)"><span class="muted">Refund total</span><span class="strong num" id="rf-total" data-max="${maxLeft}">${money(0)}</span></div>
     <div class="tiny faint">Card refunds land in 5–10 business days; the client gets a text receipt. Max ${money(maxLeft)} on this ticket.</div>`,
     foot: `<button class="btn" data-act="close-modal">Cancel</button><button class="btn danger" data-act="refund-submit" data-id="${t.id}" id="rf-submit" disabled>Refund</button>`,
-    mount(root) { const recalc = () => { let tot = 0; for (const cb of $$('[data-rl]', root)) { if (!cb.checked) continue; const i = cb.dataset.rl; const amtEl = $(`[data-rlamt="${i}"]`, root); const full = parseFloat(cb.dataset.amount); let v = Math.min(full, Math.max(0, parseFloat(amtEl.value) || 0)); tot += v; if (v >= full - 0.004) tot += parseFloat(cb.dataset.tax || '0'); } const tip = $('#rf-tip', root); if (tip && tip.checked) tot += parseFloat(tip.dataset.amount); const max = parseFloat($('#rf-total', root).dataset.max); tot = Math.min(Math.round(tot * 100) / 100, max); $('#rf-total', root).textContent = money(tot); const b = $('#rf-submit', root); b.disabled = tot <= 0; b.textContent = tot > 0 ? `Refund ${money(tot)}` : 'Refund'; }; const box = $('.modal', root) || root; box.addEventListener('change', recalc); box.addEventListener('input', recalc); } };
+    mount(root) { const recalc = () => { let tot = 0; for (const cb of $$('[data-rl]', root)) { if (!cb.checked) continue; const i = cb.dataset.rl; const amtEl = $(`[data-rlamt="${i}"]`, root); const full = parseFloat(cb.dataset.amount); let v = Math.min(full, parseFloat(cb.dataset.cap || cb.dataset.amount), Math.max(0, parseFloat(amtEl.value) || 0)); tot += v; if (v >= full - 0.004) tot += parseFloat(cb.dataset.tax || '0'); } const tip = $('#rf-tip', root); if (tip && tip.checked) tot += parseFloat(tip.dataset.amount); const max = parseFloat($('#rf-total', root).dataset.max); tot = Math.min(Math.round(tot * 100) / 100, max); $('#rf-total', root).textContent = money(tot); const b = $('#rf-submit', root); b.disabled = tot <= 0; b.textContent = tot > 0 ? `Refund ${money(tot)}` : 'Refund'; }; const box = $('.modal', root) || root; box.addEventListener('change', recalc); box.addEventListener('input', recalc); } };
 };
 Modals.refunds = () => { const rs = st().refunds.slice().sort(by((r) => r.at)).reverse().slice(0, 40); return { title: 'Refunds', wide: true, body: rs.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Client</th><th>What</th><th>Reason</th><th>To</th><th class="r">Amount</th></tr></thead><tbody>${rs.map((r) => { const c = clientById(r.clientId); return `<tr class="click" data-act="open-ticket" data-id="${r.ticketId}"><td class="small muted">${fmtDate(r.date, 'short')}</td><td class="strong">${esc(fullName(c))}</td><td class="small">${r.lines.map((l) => esc(l.name) + (l.partial ? ' (partial)' : '')).join(', ')}${r.tipRefunded ? ' + tip' : ''}</td><td class="small">${esc(r.reason)}${r.note ? `<div class="tiny faint">${esc(r.note)}</div>` : ''}</td><td class="small">${r.method === 'credit' ? 'Store credit' : PAY_LABEL[r.method] || r.method}</td><td class="r num" style="color:var(--bad-ink)">−${money(r.amount)}</td></tr>`; }).join('')}</tbody></table></div><div class="small muted" style="margin-top:8px">${st().refunds.length} refunds on file · ${money(sum(st().refunds, (r) => r.amount))} total</div>` : '<div class="empty">No refunds yet. Long may it last.</div>', foot: '<button class="btn" data-act="close-modal">Close</button>' }; };
 Object.assign(Actions, {
@@ -3470,16 +3609,17 @@ Object.assign(Actions, {
   'refunds-list': () => openModal('refunds'),
   'refund-submit': (el) => {
     const t = st().tickets.find((x) => x.id === el.dataset.id); const root = $('#modal-root');
-    const lines = []; for (const cb of $$('[data-rl]', root)) { if (!cb.checked) continue; const l = t.lines[+cb.dataset.rl]; const full = parseFloat(cb.dataset.amount); const v = Math.min(full, Math.max(0, parseFloat($(`[data-rlamt="${cb.dataset.rl}"]`, root).value) || 0)); if (v <= 0) continue; const partial = v < full - 0.004; lines.push({ name: l.name, type: l.type, refId: l.refId, qty: l.qty, amount: Math.round((v + (partial ? 0 : parseFloat(cb.dataset.tax || '0'))) * 100) / 100, partial }); }
+    const lines = []; for (const cb of $$('[data-rl]', root)) { if (!cb.checked) continue; const l = t.lines[+cb.dataset.rl]; const full = parseFloat(cb.dataset.amount); const v = Math.min(full, parseFloat(cb.dataset.cap || cb.dataset.amount), Math.max(0, parseFloat($(`[data-rlamt="${cb.dataset.rl}"]`, root).value) || 0)); if (v <= 0) continue; const partial = v < full - 0.004; lines.push({ name: l.name, type: l.type, refId: l.refId, qty: l.qty, amount: Math.round((v + (partial ? 0 : parseFloat(cb.dataset.tax || '0'))) * 100) / 100, partial, ...(l.cardId ? { cardId: l.cardId, code: l.code } : {}) }); }
     const tipEl = $('#rf-tip', root); const tipRefunded = tipEl && tipEl.checked ? parseFloat(tipEl.dataset.amount) : 0;
     if (!lines.length && !tipRefunded) return toast('Pick what to refund', 'bad');
     const max = Math.round((t.total - (t.refunded || 0)) * 100) / 100; const total = sum(lines, (l) => l.amount) + tipRefunded; if (total > max + 0.004) { const scale = max / total; lines.forEach((l) => (l.amount = Math.round(l.amount * scale * 100) / 100)); }
     const method = $('#rf-method', root).value; const reason = $('#rf-reason', root).value; const note = $('#rf-note', root).value.trim();
     const r = refundTicket(t.id, { lines, tipRefunded, method, reason, note });
-    const c = clientById(t.clientId); sendMessage(c.id, `Hi ${c.first}, we've refunded ${money(r.amount)} ${method === 'credit' ? `to your ${st().business.name} store credit` : method === 'cash' ? 'in cash' : 'to your card (allow 5–10 business days)'}. Receipt: ${bizUrl('/r/' + r.id.slice(-5))}`, 'receipt');
+    const c = clientById(t.clientId); if (!isLive()) sendMessage(c.id, `Hi ${c.first}, we've refunded ${money(r.amount)} ${method === 'credit' ? `to your ${st().business.name} store credit` : method === 'cash' ? 'in cash' : method === 'gift' ? 'to your gift card' : 'to your card (allow 5–10 business days)'}. Receipt: ${bizUrl('/r/' + r.id.slice(-5))}`, 'receipt');
     if (reason === 'Allergic reaction') addNote(c.id, { type: 'caution', text: `Refund for allergic reaction on ${fmtDate(t.date)}: ${lines.map((l) => l.name).join(', ')}. ${note || 'Check product ingredients before next visit.'}`, staffId: 's5' });
     closeModal(); rerenderContent(); if (S.ui.view === 'clients') { const d = $('#client-detail'); if (d) { d.innerHTML = clientDetail(S.ui.clientId); } }
-    toast(`Refunded ${money(r.amount)} · ${method === 'credit' ? 'store credit added' : PAY_LABEL[method] || method}`, 'good', { label: 'Ticket', act: 'open-ticket', attrs: `data-id="${t.id}"` });
+    const cards = lines.filter((l) => l.type === 'gift' && l.cardId).map((l) => giftById(l.cardId)).filter(Boolean);
+    toast(`Refunded ${money(r.amount)} · ${method === 'credit' ? 'store credit added' : r.giftBack ? `${money(r.giftBack)} back on the gift card` : PAY_LABEL[method] || method}${cards.map((g) => ` · ${giftBalance(g) > 0.004 ? `${money(giftBalance(g))} left on ${esc(g.code)}` : `${esc(g.code)} voided`}`).join('')}`, 'good', { label: 'Ticket', act: 'open-ticket', attrs: `data-id="${t.id}"` });
   },
 });
 
@@ -3809,7 +3949,7 @@ Object.assign(Actions, {
 
 /* ---- parts/46-messages.js ---- */
 /* ===== Messages & automations ===== */
-const KIND_LABEL = { reminder: 'Reminder', confirmation: 'Confirmation', rebook: 'Rebook nudge', birthday: 'Birthday', manual: 'Manual', form: 'Form link', receipt: 'Receipt', cancellation: 'Cancellation' };
+const KIND_LABEL = { reminder: 'Reminder', confirmation: 'Confirmation', rebook: 'Rebook nudge', birthday: 'Birthday', manual: 'Manual', form: 'Form link', receipt: 'Receipt', cancellation: 'Cancellation', gift: 'Gift card' };
 const AUTOMATIONS = [
   ['confirmOnBooking', 'Confirmation when booked', 'Text (front desk) or email (online) the moment an appointment is made.'],
   ['sms24h', 'Reminder the day before', 'Sent at 10am. Replies with C confirm the appointment automatically.'],
@@ -4153,7 +4293,7 @@ function reminderText(a, c, link) {
   return `Hi ${c.first}, a reminder from ${b.name}: ${apptTitle(a)}${who ? ` with ${who}` : ''} ${when} at ${fmtTime(a.start)}.${link ? `\nNeed to change it? ${link}` : b.phone ? `\nNeed to change it? Call ${fmtPhone(b.phone)}.` : ''}`;
 }
 function receiptText(t, c) {
-  const b = st().business; const lines = t.lines.map((l) => `${l.name}${l.qty > 1 ? ` x${l.qty}` : ''}  ${money(l.price * l.qty)}`).join('\n');
+  const b = st().business; const lines = t.lines.map((l) => `${l.name}${l.qty > 1 ? ` x${l.qty}` : ''}${l.code ? ` (code ${l.code})` : ''}  ${money(l.price * l.qty)}`).join('\n');
   return `Thank you, ${c.first}! Your receipt from ${b.name}, ${fmtDate(t.date)}:\n${lines}${t.discount && t.discount.type !== 'none' ? '\nDiscount applied' : ''}${t.tax ? `\nTax  ${money(t.tax)}` : ''}${t.tip ? `\nTip  ${money(t.tip)}` : ''}\nTotal  ${money(t.total)}${(t.payments || []).length ? ` (${t.payments.map((p) => PAY_LABEL[p.method] || p.method).join(' + ')})` : ''}`;
 }
 // A form for the client to fill in on their own phone (book/?f=…). The database makes the link on the first sync.
@@ -4245,12 +4385,15 @@ function installHint() {
 /* ===== Reports ===== */
 const RANGES = { today: ['Today', 1], '7d': ['7 days', 7], '30d': ['30 days', 30], '90d': ['90 days', 90] };
 function rangeDates(key) { const n = RANGES[key][1]; const end = todayStr(); const start = addDays(end, -(n - 1)); return { start, end, prevStart: addDays(start, -n), prevEnd: addDays(start, -1), n }; }
+// a gift card is money held for the client, not revenue yet: it counts when it's spent, not when it's sold
+const giftSold = (t) => sum(t.lines.filter((l) => l.type === 'gift'), (l) => l.price * l.qty);
+const earned = (t) => Math.max(0, t.total - t.tip - giftSold(t));
 function periodStats(start, end) {
   const tix = st().tickets.filter((t) => t.date >= start && t.date <= end);
   const appts = st().appointments.filter((a) => a.date >= start && a.date <= end);
   const done = appts.filter((a) => a.status === 'completed'); const noshow = appts.filter((a) => a.status === 'noshow');
-  const refundList = st().refunds.filter((r) => r.date >= start && r.date <= end); const refunds = sum(refundList, (r) => r.amount - (r.tipRefunded || 0));
-  const revenue = sum(tix, (t) => t.total - t.tip) - refunds; const tips = sum(tix, (t) => t.tip) - sum(refundList, (r) => r.tipRefunded || 0);
+  const refundList = st().refunds.filter((r) => r.date >= start && r.date <= end); const refunds = sum(refundList, (r) => r.amount - (r.tipRefunded || 0) - sum((r.lines || []).filter((l) => l.type === 'gift'), (l) => l.amount));
+  const revenue = sum(tix, earned) - refunds; const tips = sum(tix, (t) => t.tip) - sum(refundList, (r) => r.tipRefunded || 0);
   const svcRev = sum(tix, (t) => sum(t.lines.filter((l) => l.type === 'service'), (l) => l.price * l.qty));
   const retailRev = sum(tix, (t) => sum(t.lines.filter((l) => l.type === 'product'), (l) => l.price * l.qty));
   const withRetail = tix.filter((t) => t.lines.some((l) => l.type === 'product')).length;
@@ -4283,8 +4426,8 @@ Views.reports = {
   render() {
     const r = rangeDates(S.ui.reportRange); const cur = periodStats(r.start, r.end); const prev = periodStats(r.prevStart, r.prevEnd); const hasPrior = diffDays(r.prevStart, todayStr()) <= HISTORY_DAYS;
     const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i));
-    const byDay = days.map((d) => sum(cur.tix.filter((t) => t.date === d), (t) => t.total - t.tip));
-    const sparkVals = r.n === 1 ? Array.from({ length: 12 }, (_, i) => sum(st().tickets.filter((t) => t.date === addDays(r.end, i - 11)), (t) => t.total - t.tip)) : (r.n <= 12 ? byDay : Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i * r.n / 12), b = Math.floor((i + 1) * r.n / 12); return sum(byDay.slice(a, b)); }));
+    const byDay = days.map((d) => sum(cur.tix.filter((t) => t.date === d), earned));
+    const sparkVals = r.n === 1 ? Array.from({ length: 12 }, (_, i) => sum(st().tickets.filter((t) => t.date === addDays(r.end, i - 11)), earned)) : (r.n <= 12 ? byDay : Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i * r.n / 12), b = Math.floor((i + 1) * r.n / 12); return sum(byDay.slice(a, b)); }));
     delta.off = !hasPrior;
     const tiles = `<div class="report-grid">
       <div class="stat span-4"><div class="label">Net revenue (before tips, after refunds)</div><div class="value">${money(cur.revenue, { whole: true })}</div>${delta(cur.revenue, prev.revenue)}${sparkline(sparkVals)}</div>
@@ -4298,7 +4441,7 @@ Views.reports = {
     </div>`;
     const catRev = CAT_ORDER.map((k) => ({ k, v: sum(cur.tix, (t) => sum(t.lines.filter((l) => l.type === 'service' && svcById(l.refId)?.cat === k), (l) => l.price * l.qty)) }));
     const retailV = cur.retailRev; const catMax = Math.max(...catRev.map((c) => c.v), retailV, 1);
-    const staffRows = bookableStaff().map((s) => { const booked = sum(cur.appts.filter((a) => a.staffId === s.id && !['cancelled', 'noshow'].includes(a.status)), (a) => a.dur); const avail = days.reduce((n, d) => { const h = s.days[dow(d)]; return n + (h ? h[1] - h[0] : 0); }, 0); const rev = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.total - t.tip); const tips = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.tip); return { s, util: avail ? booked / avail : 0, rev, tips, n: cur.tix.filter((t) => t.staffId === s.id).length }; });
+    const staffRows = bookableStaff().map((s) => { const booked = sum(cur.appts.filter((a) => a.staffId === s.id && !['cancelled', 'noshow'].includes(a.status)), (a) => a.dur); const avail = days.reduce((n, d) => { const h = s.days[dow(d)]; return n + (h ? h[1] - h[0] : 0); }, 0); const rev = sum(cur.tix.filter((t) => t.staffId === s.id), earned); const tips = sum(cur.tix.filter((t) => t.staffId === s.id), (t) => t.tip); return { s, util: avail ? booked / avail : 0, rev, tips, n: cur.tix.filter((t) => t.staffId === s.id).length }; });
     const svcCounts = {}; for (const t of cur.tix) for (const l of t.lines) if (l.type === 'service') { const o = (svcCounts[l.refId] ||= { n: 0, rev: 0 }); o.n += l.qty; o.rev += l.price * l.qty; }
     const topSvc = Object.entries(svcCounts).map(([id, o]) => ({ s: svcById(id), ...o })).filter((x) => x.s).sort((a, b) => b.rev - a.rev).slice(0, 8);
     const hours = Array.from({ length: 11 }, (_, i) => 480 + i * 60); const dows = [1, 2, 3, 4, 5, 6];
@@ -4316,8 +4459,8 @@ Views.reports = {
   },
   mount(root) {
     const draw = () => { const el = $('[data-chart="revenue"]', root); if (!el) return; const r = rangeDates(S.ui.reportRange); const cur = periodStats(r.start, r.end); let labels, values, tips;
-      if (r.n === 1) { const hours = Array.from({ length: 12 }, (_, i) => 480 + i * 60); values = hours.map((h) => sum(cur.tix.filter((t) => { const m = new Date(t.closedAt); return m.getHours() * 60 >= h && m.getHours() * 60 < h + 60; }), (t) => t.total - t.tip)); labels = hours.map((h) => fmtTime(h)); tips = hours.map((h, i) => `${fmtTime(h)}–${fmtTime(h + 60)}: ${money(values[i])}`); }
-      else { const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i)); values = days.map((d) => sum(cur.tix.filter((t) => t.date === d), (t) => t.total - t.tip)); labels = days.map((d) => r.n <= 7 ? fmtDate(d, 'dow') : r.n <= 31 ? String(fromDateStr(d).getDate()) : fmtDate(d, 'short')); tips = days.map((d, i) => `${fmtDate(d, 'dow')}: ${money(values[i])} · ${cur.tix.filter((t) => t.date === d).length} tickets`); }
+      if (r.n === 1) { const hours = Array.from({ length: 12 }, (_, i) => 480 + i * 60); values = hours.map((h) => sum(cur.tix.filter((t) => { const m = new Date(t.closedAt); return m.getHours() * 60 >= h && m.getHours() * 60 < h + 60; }), earned)); labels = hours.map((h) => fmtTime(h)); tips = hours.map((h, i) => `${fmtTime(h)}–${fmtTime(h + 60)}: ${money(values[i])}`); }
+      else { const days = Array.from({ length: r.n }, (_, i) => addDays(r.start, i)); values = days.map((d) => sum(cur.tix.filter((t) => t.date === d), earned)); labels = days.map((d) => r.n <= 7 ? fmtDate(d, 'dow') : r.n <= 31 ? String(fromDateStr(d).getDate()) : fmtDate(d, 'short')); tips = days.map((d, i) => `${fmtDate(d, 'dow')}: ${money(values[i])} · ${cur.tix.filter((t) => t.date === d).length} tickets`); }
       el.innerHTML = barChart({ values, labels, tips, width: el.clientWidth || 600, height: 220, labelEvery: r.n > 31 ? 15 : r.n > 14 ? 5 : 1 }); };
     draw();
     if (window.ResizeObserver) { const ro = new ResizeObserver(debounce(draw, 120)); const el = $('[data-chart="revenue"]', root); if (el) ro.observe(el); }
@@ -4442,6 +4585,8 @@ Object.assign(Actions, {
   App.render();
   installHint();
   Cloud.handleAuthRedirect();   // a reset or confirmation link from email
+  // "Sign in" on the website (?signin): open the studio's live business from the cloud
+  try { if (new URLSearchParams(location.search).has('signin')) { history.replaceState(null, '', location.pathname); if (!isLive() && Cloud.available()) Actions['cloud-from-cloud'](); } } catch (e) {}
   if (isLive()) Cloud.start();
   // leaving the app (home button, app switcher, lock screen): write this device's copy now and push what's waiting,
   // rather than trusting a timer that iOS may never let run
