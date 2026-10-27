@@ -31,7 +31,8 @@ const ipad = { viewport: { width: 1180, height: 820 }, hasTouch: true };
 const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 
 const { p: pad } = await ctx(ipad);
-await pad.goto(base); await pad.waitForSelector('#rail .nav-item', { state: 'attached' });
+await pad.goto(base + '?studio=simplyfacials'); await pad.waitForSelector('#rail .nav-item', { state: 'attached' });   // the pitch link creates Simply Facials' demo
+await pad.goto(base); await pad.waitForSelector('#rail .nav-item', { state: 'attached' });                            // later reloads use the plain app
 
 await t('demo app shows the go-live card in Online booking settings', async () => {
   await pad.click('[data-act="go"][data-view="settings"]'); await pad.click('[data-act="settings-tab"][data-id="booking"]');
@@ -202,6 +203,10 @@ await t('a second iPad signs in and opens the same business from the cloud', asy
   await until(() => p.evaluate(() => window.Luster.state.live && window.Luster.state.appointments.filter((a) => a.status !== 'cancelled').length >= 2), 8000, 'appointments on the second iPad');
   const names = await p.evaluate(() => window.Luster.state.staff.map((s) => s.name)); const first = await pad.evaluate(() => window.Luster.state.staff.map((s) => s.name));
   ok(JSON.stringify(names) === JSON.stringify(first), `team differs: ${names} vs ${first}`);
+  // the studio's own menu sections, consent forms and which services need them come down too, not the business type's defaults
+  const setup = (q) => q.evaluate(() => { const s = window.Luster.state; return JSON.stringify({ cats: s.categories.map((c) => c.id + ':' + c.label), consentFor: Object.keys(s.consentFor || {}).sort().map((k) => k + '>' + s.consentFor[k]), forms: s.formTemplates.map((f) => f.id).sort() }); });
+  await until(async () => (await setup(p)) === (await setup(pad)), 8000, 'menu sections and consents on the second iPad').catch(async (e) => { throw new Error(e.message + ': ' + await setup(p) + ' vs ' + await setup(pad)); });
+  ok(/sf_cryosculpt>cryo/.test(await setup(p)), 'cryotherapy consent mapping missing');
   ok(await p.evaluate(() => window.Luster.state.clients.some((c) => c.first === 'Ava' && c.flags)), 'clients missing');
 });
 await t('the second iPad gets notes, the sale and the flags, and opens health files on demand (logged)', async () => {
@@ -280,7 +285,7 @@ await t('a script error on the iPad reaches support, without the client\'s phone
   const row = await until(async () => (await as(db, 'postgres', `select kind, message, build, device, business_id from app_events where message like '%diag test%'`)).rows[0], 6000, 'support event');
   ok(row.kind === 'error' && /\[phone\]/.test(row.message) && /\[email\]/.test(row.message) && !/555-0142|ava@example/.test(row.message), row.message);
   ok(row.build && row.build !== 'dev' && row.business_id, JSON.stringify(row));
-  for (let i = errors.length - 1; i >= 0; i--) if (/diag test/.test(errors[i])) errors.splice(i, 1);   // thrown on purpose
+  // the error was thrown on purpose; it's left out of the page-error check at the end (its event can arrive after this point)
 });
 await t('website kit: button code with the booking link, a QR code, a printable sign', async () => {
   await pad.evaluate(() => { window.Luster.go('settings'); Actions['settings-tab']({ dataset: { id: 'booking' } }); });
@@ -309,5 +314,6 @@ await t('forgot password: the emailed link opens the app, a new password is set,
 });
 
 await browser.close(); await srv.close();
-if (errors.length) { console.log('page errors:\n ' + [...new Set(errors)].join('\n ')); fails++; }
+const unexpected = errors.filter((e) => !/diag test/.test(e));
+if (unexpected.length) { console.log('page errors:\n ' + [...new Set(unexpected)].join('\n ')); fails++; }
 console.log(fails ? `${fails} FAILED` : 'all passed'); process.exit(fails ? 1 : 0);

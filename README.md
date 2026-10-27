@@ -32,6 +32,15 @@ https://www.nwluster.com/?biz=hair&name=Magnolia%20Hair%20Studio&owner=Renee&tea
 `biz` is one of `facial`, `hair`, `lash`, `nails`, `massage`, `medspa`, `barber`; `name`, `owner`, `team` (2–6),
 `phone` and `address` are optional. The same link always opens the same business on that device.
 
+Without a link the app opens a made-up example studio (Glow Theory Skin Studio) on the generic facial menu. Luster is
+for any studio, so the public demo never shows a real one.
+
+A studio being pitched can get its own link with its real menu, prices, hours, memberships and consent rules
+(`src/parts/32-studios.js`). Simply Facials: `https://www.nwluster.com/?studio=simplyfacials` (a setup link with the
+exact name, `?biz=facial&name=Simply%20Facials`, opens it too). Its team is made-up people in the studio's real roles;
+rename them in Settings → Team on the pitch iPad. Going live from that demo copies the whole menu into the studio's
+live business.
+
 ## Online booking
 
 A demo becomes a real business from **Settings → Online booking → Put it online**: sign in, pick the booking link,
@@ -49,9 +58,12 @@ to print for the counter.
 
 - **URL Configuration**: Site URL `https://www.nwluster.com`; add `https://www.nwluster.com/**` to Redirect URLs.
   Password-reset and confirmation links come back to the app through these.
-- **Emails**: Supabase's built-in sender only delivers to members of the Supabase organization. Before studios sign up,
-  connect a real sender under SMTP Settings (Google Workspace or Resend), or new owners never get their confirmation
-  and reset emails.
+- **Emails**: account emails (sign-up confirmation, password reset) go out through Resend from `mail.nwluster.com`,
+  connected with Resend's Supabase integration (Resend → Settings → Integrations), which fills in Supabase's SMTP
+  settings. Supabase's built-in sender only delivers to members of the Supabase organization. The branded templates
+  live in `supabase/templates/` (paste into Authentication → Emails → Templates; subjects are in each file's first
+  comment). With a working sender, keep **Confirm email** on: the app already handles both the "check your inbox"
+  step and the link coming back.
 
 ## Update the live app
 
@@ -77,6 +89,7 @@ src/build.sh, build-pwa.sh   build the artifact fragment / the installable app a
 src/icons.js                 renders the icon PNGs from one vector mark
 src/test/                    Playwright tests: run.js, ws.js (UI), setup.js (links), pwa.js (install), import.js (CSV)
 supabase/migrations/         the database: tables, row-level security, booking functions
+supabase/templates/          the account emails (confirm sign-up, reset password), as pasted into Supabase
 supabase/test/               database + end-to-end tests against an in-process Postgres
 vendor/                      supabase-js and the QR code generator, served from our own domain (sources.txt)
 ops/                         release packing, vendor fetching, the GitHub workflow template

@@ -19,7 +19,7 @@
   --bad:  #B23A30; --bad-soft:  #F9E3E0; --bad-ink: #8C2A22;
   --info-soft: #E7EEF6;
   /* service categories = validated chart slots (aqua, violet, yellow, magenta, blue) */
-  --slot-1: #1baf7a; --slot-2: #6250d6; --slot-3: #eda100; --slot-4: #e87ba4; --slot-5: #2a78d6;
+  --slot-1: #1baf7a; --slot-2: #6250d6; --slot-3: #eda100; --slot-4: #e87ba4; --slot-5: #2a78d6; --slot-6: #0f9ab0;
   --chart-grid: #E6E4DD; --chart-axis: #C9C6BD; --chart-muted: #8A9399;
   --scrim: rgba(27,34,36,0.42);
   --shadow-1: 0 1px 2px rgba(27,34,36,0.06);
@@ -39,7 +39,7 @@
     --warn: #DCA94E; --warn-soft: #3A2E15; --warn-ink: #F0C97E;
     --bad: #E27C72; --bad-soft: #3D1F1C; --bad-ink: #F2A49C;
     --info-soft: #1F2C3A;
-    --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5;
+    --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5; --slot-6: #2fb7cc;
     --chart-grid: #2A3337; --chart-axis: #3A464B; --chart-muted: #7E888D;
     --scrim: rgba(0,0,0,0.6);
     --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
@@ -56,7 +56,7 @@
   --warn: #DCA94E; --warn-soft: #3A2E15; --warn-ink: #F0C97E;
   --bad: #E27C72; --bad-soft: #3D1F1C; --bad-ink: #F2A49C;
   --info-soft: #1F2C3A;
-  --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5;
+  --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5; --slot-6: #2fb7cc;
   --chart-grid: #2A3337; --chart-axis: #3A464B; --chart-muted: #7E888D;
   --scrim: rgba(0,0,0,0.6);
   --shadow-1: 0 1px 2px rgba(0,0,0,0.3);

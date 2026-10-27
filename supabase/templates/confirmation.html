@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Supabase → Authentication → Emails → Templates → Confirm signup. Subject: Confirm your Luster account -->
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>Confirm your Luster account</title></head>
+<body style="margin:0;padding:0;background:#F3F2ED;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">One tap and your studio is ready to go online.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F2ED;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E2DFD7;border-radius:14px;">
+      <tr><td style="padding:28px 28px 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1E5C68;">Luster</td></tr>
+      <tr><td style="padding:18px 28px 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;color:#1B2224;">Confirm your email</td></tr>
+      <tr><td style="padding:14px 28px 0 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#566068;">
+        Welcome to Luster. Confirm <b style="color:#1B2224;">{{ .Email }}</b> and your studio is ready to go online. Open this on the iPad you're setting up and you'll be signed in right away.
+      </td></tr>
+      <tr><td style="padding:24px 28px 0 28px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#1E5C68" style="border-radius:10px;">
+          <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:10px;">Confirm my email</a>
+        </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:20px 28px 0 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#8A9399;">
+        Opened it on another device? That's fine: go back to the iPad and sign in with the same email and password. If you didn't create a Luster account, ignore this email.
+      </td></tr>
+      <tr><td style="padding:16px 28px 0 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8A9399;word-break:break-all;">
+        Button not working? Paste this into your browser:<br><a href="{{ .ConfirmationURL }}" style="color:#1E5C68;">{{ .ConfirmationURL }}</a>
+      </td></tr>
+      <tr><td style="padding:28px 28px 0 28px;"></td></tr>
+      <tr><td style="padding:18px 28px 24px 28px;border-top:1px solid #E2DFD7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8A9399;">
+        Luster · front-desk software for salons, spas and studios<br>New World Logic LLC · Louisiana · <a href="https://www.nwluster.com" style="color:#1E5C68;">nwluster.com</a><br>Questions? Email <a href="mailto:ixv@nwluster.com" style="color:#1E5C68;">ixv@nwluster.com</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

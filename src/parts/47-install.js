@@ -3,23 +3,27 @@
      ?biz=hair&name=Magnolia%20Hair%20Studio&owner=Renee&team=5[&phone=…&address=…]
    biz = a TEMPLATES id. The params stay in the URL on purpose: iOS installs the page URL as the start URL and
    Chrome reads the start_url we put in the manifest below, so first launch of the installed app sees them too. */
+/* A studio's pitch link opens its real menu (32-studios.js): ?studio=simplyfacials, or a setup link with the studio's exact name. */
 function setupFromUrl() {
   let q; try { q = new URLSearchParams(location.search); } catch (e) { return null; }
-  const biz = (q.get('biz') || '').trim().toLowerCase(); if (!TEMPLATES[biz]) return null;
   const take = (k, n) => (q.get(k) || '').trim().slice(0, n);
-  return { biz, name: take('name', 48), owner: take('owner', 24), team: take('team', 2), phone: take('phone', 24), address: take('address', 80) };
+  let studio = take('studio', 32).toLowerCase(); if (!STUDIOS[studio]) studio = '';
+  const biz = studio ? STUDIOS[studio].template : take('biz', 16).toLowerCase(); if (!TEMPLATES[biz]) return null;
+  const s = { biz, studio, name: take('name', 48), owner: take('owner', 24), team: take('team', 2), phone: take('phone', 24), address: take('address', 80) };
+  if (!s.studio && s.name && !s.owner && !s.team) { const p = Object.values(STUDIOS).find((x) => x.template === biz && slugify(x.name) === slugify(s.name)); if (p) s.studio = p.id; }
+  return s;
 }
-const setupKeyOf = (s) => `${s.biz}:${slugify(s.name || TEMPLATES[s.biz].defaults.name)}`;
+const setupKeyOf = (s) => (s.studio ? `studio:${s.studio}` : `${s.biz}:${slugify(s.name || TEMPLATES[s.biz].defaults.name)}`);
 /* Runs before loadState(). Returns true when it created the workspace itself (S.state is then already set). */
 function applySetupLink() {
   const s = setupFromUrl(); if (!s) return false;
   const key = setupKeyOf(s); const existing = loadIndex();
-  const isDefault = s.biz === 'facial' && !s.owner && slugify(s.name || TEMPLATES.facial.defaults.name) === slugify(TEMPLATES.facial.defaults.name);
-  const hit = existing ? existing.find((w) => w.setupKey === key || (isDefault && w.id === 'simply')) : null;
+  const isDefault = !s.studio && s.biz === 'facial' && !s.owner && slugify(s.name || TEMPLATES.facial.defaults.name) === slugify(TEMPLATES.facial.defaults.name);
+  const hit = existing ? existing.find((w) => w.setupKey === key || (isDefault && isExampleWs(w)) || (s.studio && !w.live && w.opts && w.opts.studio === s.studio)) : null;
   if (hit) { try { localStorage.setItem(WS_CUR_KEY, hit.id); } catch (e) {} return false; }   // the link always opens that business
   if (isDefault) return false;                                                                 // the normal boot seeds the example business
   if (!existing) S.wsIndex = [];                                                               // a personalized install starts with just that business
-  const ws = createWorkspace(s.biz, { name: s.name, owner: s.owner, team: s.team, phone: s.phone, address: s.address });
+  const ws = createWorkspace(s.biz, { name: s.name, owner: s.owner, team: s.team, phone: s.phone, address: s.address, ...(s.studio ? { studio: s.studio } : {}) });
   ws.setupKey = key; saveIndex(workspaces());
   return true;
 }

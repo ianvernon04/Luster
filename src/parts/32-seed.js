@@ -1,26 +1,40 @@
 /* ===== Workspace catalog + generated history, driven by an industry template ===== */
 const FIRST = ['Amelia', 'Brooke', 'Camille', 'Destiny', 'Elise', 'Faith', 'Gabrielle', 'Hannah', 'Isabel', 'Jasmine', 'Kiara', 'Lauren', 'Monique', 'Nia', 'Olivia', 'Paige', 'Renee', 'Simone', 'Tiffany', 'Victoria', 'Whitney', 'Alexis', 'Bianca', 'Celeste', 'Danielle', 'Erin', 'Felicia', 'Giselle', 'Haley', 'Imani', 'Jade', 'Kelsey', 'Lindsey', 'Madison', 'Natalie', 'Octavia', 'Priya', 'Rachel', 'Sierra', 'Taylor', 'Vanessa', 'Yolanda', 'Zoe', 'Angela', 'Brittany', 'Chloe', 'Dominique', 'Emily', 'Francesca', 'Grace', 'Heather', 'Ivy', 'Jordan', 'Kristen', 'Leah', 'Maya', 'Nicole', 'Ophelia', 'Peyton', 'Quinn', 'Rosa', 'Sabrina', 'Tara', 'Uma', 'Valerie', 'Willow', 'Ximena', 'Yasmin', 'Zara', 'Marcus', 'Devin', 'Andre', 'Caleb', 'Tyler', 'Jalen'];
 const LAST = ['Landry', 'Hebert', 'Broussard', 'Guidry', 'Fontenot', 'Richard', 'LeBlanc', 'Robinson', 'Williams', 'Johnson', 'Jackson', 'Thomas', 'Washington', 'Martin', 'Bergeron', 'Trahan', 'Dupre', 'Melancon', 'Babineaux', 'Carter', 'Simmons', 'Harris', 'Lewis', 'Nguyen', 'Tran', 'Patel', 'Garcia', 'Rodriguez', 'Hernandez', 'Morales', 'Scott', 'Green', 'Baker', 'Adams', 'Mitchell', 'Campbell', 'Roberts', 'Phillips', 'Evans', 'Turner', 'Parker', 'Collins', 'Edwards', 'Stewart', 'Morris', 'Reed', 'Cook', 'Bell', 'Murphy', 'Rivera', 'Cooper', 'Ward', 'Peterson', 'Gray', 'James', 'Watson', 'Brooks', 'Kelly', 'Sanders', 'Price', 'Bennett', 'Wood', 'Barnes', 'Ross', 'Henderson', 'Coleman', 'Jenkins', 'Perry', 'Powell', 'Long', 'Patterson', 'Hughes', 'Flores', 'Butler', 'Simms', 'Foster', 'Gonzales', 'Bryant', 'Alexander', 'Russell', 'Griffin', 'Diaz', 'Hayes'];
+const MEN = new Set(['Marcus', 'Devin', 'Andre', 'Caleb', 'Tyler', 'Jalen']);   // first names above that the seed treats as men (no pregnancies; the men's facial)
 const SOURCES = ['Instagram', 'Google', 'Referral', 'Walk-in', 'Website', 'TikTok', 'Referral', 'Instagram'];
 const EVENTS = ['a wedding', 'graduation', 'family photos', 'a gala', 'vacation', 'an anniversary dinner', 'a reunion'];
 const WAITLIST_NOTES = ['Any Saturday morning', 'Flexible on time, prefers the owner', 'Before the 15th (wedding)', 'Evenings after 5 only', 'Wants a cancellation slot this week'];
 const SCHEDULES = [{ 2: [540, 1020], 3: [540, 1020], 4: [540, 1020], 5: [540, 1020], 6: [480, 900] }, { 1: [540, 1080], 2: [540, 1080], 3: [540, 1080], 4: [540, 1080], 5: [540, 1080] }, { 2: [600, 1140], 3: [600, 1140], 4: [600, 1140], 5: [600, 1140], 6: [540, 1020] }, { 1: [480, 960], 2: [480, 960], 4: [480, 960], 5: [480, 960], 6: [480, 900] }, { 1: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [540, 1020] }, { 2: [540, 1080], 3: [540, 1080], 5: [540, 1080], 6: [480, 960] }];
 
-/* Builds the catalog for a workspace: the template's services, categories, products and forms with the business's own name, team and address. */
+/* Builds the catalog for a workspace: the template's services, categories, products and forms with the business's own name, team and address.
+   With opts.studio (a pitch link, 32-studios.js) it's that real studio's menu, prices, hours, memberships and team structure instead. */
+const studioOf = (templateId, id) => (id && STUDIOS[id] && STUDIOS[id].template === templateId ? STUDIOS[id] : null);
 function catalogFor(templateId, opts = {}) {
   const T = TEMPLATES[templateId] || TEMPLATES.facial; const d = T.defaults;
-  const name = (opts.name || '').trim() || d.name; const slug = slugify(name);
+  const P = studioOf(T.id, opts.studio); const src = P || T;
+  const name = (opts.name || '').trim() || (P ? P.name : d.name); const slug = slugify(name);
   const rng = mulberry32(hashHue(name) + 11);
-  const staff = T.staff && !opts.name ? JSON.parse(JSON.stringify(T.staff)) : generateStaff(T, opts, rng);
+  const copy = (x) => JSON.parse(JSON.stringify(x));
+  const staff = P ? copy(P.staff) : T.staff && !opts.name ? copy(T.staff) : generateStaff(T, opts, rng);
   return {
-    templateId, workspace: { name, templateId, opts: { ...opts, name } },
-    business: { name, tagline: T.label, phone: (opts.phone || '').trim() || d.phone, email: `hello@${slug}.example`, address: (opts.address || '').trim() || d.address, slug, taxRate: d.taxRate ?? 0.0995, hours: { 0: null, 1: [540, 1080], 2: [540, 1140], 3: [540, 1140], 4: [540, 1140], 5: [540, 1140], 6: [480, 1020] } },
-    categories: T.categories.map((c) => ({ ...c })), staff,
-    services: T.services.map((s) => ({ ...s })), products: T.products.map((p) => ({ ...p })), plans: T.plans.map((p) => ({ ...p, perks: p.perks.slice(), includes: p.includes.slice() })),
-    formTemplates: [intakeTemplate(T), ...T.consents.map((c) => JSON.parse(JSON.stringify(c))), JSON.parse(JSON.stringify(PHOTO_RELEASE))],
-    consentFor: { ...T.consentFor },
+    templateId, studio: P ? P.id : undefined, workspace: { name, templateId, opts: { ...opts, name } },
+    business: { name, tagline: T.label, phone: (opts.phone || '').trim() || (P ? P.phone : d.phone), email: `hello@${slug}.example`, address: (opts.address || '').trim() || (P ? P.address : d.address), slug, taxRate: d.taxRate ?? 0.105, hours: P ? copy(P.hours) : { 0: null, 1: [540, 1080], 2: [540, 1140], 3: [540, 1140], 4: [540, 1140], 5: [540, 1140], 6: [480, 1020] } },
+    categories: src.categories.map((c) => ({ ...c })), staff,
+    services: src.services.map((s) => copy(s)), products: (P && P.products || T.products).map((p) => ({ ...p })), plans: src.plans.map((p) => ({ ...p, perks: p.perks.slice(), includes: p.includes.slice() })),
+    formTemplates: [intakeTemplate(T), ...T.consents.map(copy), ...(P ? P.consents.map(copy) : []), copy(PHOTO_RELEASE)],
+    consentFor: { ...src.consentFor },
+    copy: P ? { ...T.copy, ...P.copy } : undefined,
     settings: { reminders: { confirmOnBooking: true, sms24h: true, sms2h: true, emailConfirm: true, rebookNudge: true, rebookDays: 28, birthday: true, reviewRequest: false }, booking: { leadMinutes: 60, windowDays: 60, depositRequired: false, cancelHours: 24 } },
   };
+}
+/* The template as the demo generator sees it: a studio profile brings its own add-on habits, rebooking rhythm, mix of
+   caution flags and treatment notes. */
+function seedTpl(cat) {
+  const T = TEMPLATES[cat.templateId] || TEMPLATES.facial; const P = studioOf(T.id, cat.studio);
+  if (!P) return T;
+  const s = P.seed || {};
+  return { ...T, addonWith: s.addonWith || T.addonWith, gaps: { ...T.gaps, ...(s.gaps || {}) }, flagPool: s.flagPool || T.flagPool, notes: { ...T.notes, ...(s.notes || {}) }, copy: { ...T.copy, ...(P.copy || {}) } };
 }
 function generateStaff(T, opts, rng) {
   const n = clamp(parseInt(opts.team, 10) || 4, 2, 6); const used = new Set(); const firsts = T.staffFirst || FIRST; const out = [];
@@ -33,7 +47,7 @@ function generateStaff(T, opts, rng) {
 }
 
 function generateClients(rng, cat) {
-  const T = TEMPLATES[cat.templateId]; const clients = []; const used = new Set(); const today = todayStr();
+  const T = seedTpl(cat); const clients = []; const used = new Set(); const today = todayStr();
   const firsts = T.clientFirst || FIRST; const cf = T.clientFields;
   for (let i = 0; i < 420; i++) {
     let first, last, key;
@@ -47,10 +61,11 @@ function generateClients(rng, cat) {
     const concerns = uniq([pick(rng, cf.concernOptions), chance(rng, 0.6) ? pick(rng, cf.concernOptions) : null, chance(rng, 0.25) ? pick(rng, cf.concernOptions) : null].filter(Boolean));
     const allergies = chance(rng, 0.14) ? [pick(rng, T.allergyPool)] : [];
     const flags = [];
-    for (const [k, p] of T.flagPool) if (chance(rng, p)) { flags.push(k); if (flags.length >= 2) break; }
+    for (const [k, p] of T.flagPool) if (chance(rng, p) && !(k === 'pregnant' && MEN.has(first))) { flags.push(k); if (flags.length >= 2) break; }
     const medical = seedMedical(rng, flags, allergies, T);
     if (allergies.length) flags.push('allergy');
-    const member = chance(rng, 0.24) ? pick(rng, [cat.plans[0].id, cat.plans[0].id, cat.plans[0].id, (cat.plans[1] || cat.plans[0]).id]) : null;
+    const planMix = cat.plans.length > 2 ? [0, 0, 0, 0, 1, 1, ...cat.plans.slice(2).map((p, i) => i + 2)] : [0, 0, 0, Math.min(1, cat.plans.length - 1)];   // the first plan is the popular one
+    const member = chance(rng, 0.24) ? cat.plans[pick(rng, planMix)].id : null;
     const memberSince = member ? addDays(today, -rint(rng, 20, Math.max(21, createdDaysAgo - 10))) : null;
     const priorVisits = createdDaysAgo > 120 ? Math.round((createdDaysAgo - 90) / 365 * (freq * 4 + 2)) : 0;
     const priorSpend = priorVisits ? priorVisits * (70 + freq * 12) + rint(rng, 0, 120) : 0;
@@ -69,7 +84,7 @@ function generateClients(rng, cat) {
 function seedMedical(rng, flags, allergies, T) {
   const has = (k) => flags.includes(k);
   const conditions = [];
-  if (has('oncology')) conditions.push('Cancer (current or past)'); if (has('diabetes')) conditions.push('Diabetes'); if (has('hsv')) conditions.push('Cold sores (herpes simplex)'); if (has('autoimmune')) conditions.push('Autoimmune disorder (lupus, RA, MS…)'); if (has('pacemaker')) conditions.push(pick(rng, ['Pacemaker or metal implants', 'Epilepsy or seizures'])); if (has('thinners')) conditions.push('Bleeding or clotting disorder'); if (has('keloid')) conditions.push('Keloid or raised scarring'); if (has('dvt')) conditions.push('Blood clots or DVT'); if (has('neuro')) conditions.push('Neuromuscular disorder (MG, ALS…)'); if (has('surgery')) conditions.push('Recent surgery (last 6 months)');
+  if (has('oncology')) conditions.push('Cancer (current or past)'); if (has('diabetes')) conditions.push('Diabetes'); if (has('hsv')) conditions.push('Cold sores (herpes simplex)'); if (has('autoimmune')) conditions.push('Autoimmune disorder (lupus, RA, MS…)'); if (has('pacemaker')) conditions.push(pick(rng, ['Pacemaker or metal implants', 'Epilepsy or seizures'])); if (has('thinners')) conditions.push('Bleeding or clotting disorder'); if (has('keloid')) conditions.push('Keloid or raised scarring'); if (has('dvt')) conditions.push('Blood clots or DVT'); if (has('neuro')) conditions.push('Neuromuscular disorder (MG, ALS…)'); if (has('surgery')) conditions.push('Recent surgery (last 6 months)'); if (has('cold')) conditions.push(COLD_CONDITION);
   if (chance(rng, 0.08)) conditions.push(pick(rng, ['Thyroid condition', 'Asthma', 'Rosacea', 'Eczema, psoriasis or dermatitis', 'Heart condition or high blood pressure']));
   if (!conditions.length) conditions.push('None of these');
   const meds = [];
@@ -105,16 +120,22 @@ function intakeAnswersFor(c, rng, T) {
   if (m.procedures[0] !== 'None of these') a.procedures_date = addDays(todayStr(), -rint(rng, 3, 20));
   return a;
 }
+// like pick(), but a service can be more popular than its neighbours (seedWeight); unweighted lists pick exactly as pick() does
+function wpick(rng, arr) { const w = (s) => s.seedWeight || 1; let x = rng() * sum(arr, w); for (const s of arr) { x -= w(s); if (x < 0) return s; } return arr[arr.length - 1]; }
 function weightedClientPicker(rng, clients) { const pool = []; clients.forEach((c) => { for (let k = 0; k < c.freq; k++) pool.push(c); }); return () => pick(rng, pool); }
 
 /* Generates appointments, tickets, refunds, notes, photos, forms, messages and a waitlist for the window around `today`. Runs at first load and whenever the calendar day changes. */
 function generateActivity(cat, clients, today, rng, existing = []) {
-  const T = TEMPLATES[cat.templateId];
+  const T = seedTpl(cat);
   const existingBy = {}; for (const e of existing) { if (e.status === 'cancelled') continue; (existingBy[e.date + '|' + e.staffId] ||= []).push(e); }
   const svcById = Object.fromEntries(cat.services.map((s) => [s.id, s]));
-  const mains = cat.services.filter((s) => !s.addon && !s.noAuto && s.price > 0);
+  const mains = cat.services.filter((s) => !s.addon && !s.noAuto && !s.noSeed && s.price > 0);
   const addons = cat.services.filter((s) => s.addon);
   const pickClient = weightedClientPicker(rng, clients);
+  // the demo studio follows its own safety rules: nobody is booked into a service their caution flags rule out, and a
+  // service made for flagged clients (RESTORE) mostly goes to them
+  const unsafe = (c, s) => (T.contra || []).some((r) => r.level === 'bad' && c.flags.includes(r.flag) && (r.services.includes(s.id) || r.cats.includes(s.cat)));
+  const meantFor = {}; const poolFor = (s) => (meantFor[s.id] ||= s.seedFor === 'men' ? clients.filter((c) => MEN.has(c.first)) : clients.filter((c) => c.flags.some((f) => s.forFlags.includes(f))));
   const appts = [], tickets = [], notes = [], photos = [], forms = [], messages = [], waitlist = [], refunds = [];
   let n = 0;
   const byCat = groupBy(mains, (s) => s.cat);
@@ -131,15 +152,20 @@ function generateActivity(cat, clients, today, rng, existing = []) {
       let cursor = hrs[0] + pick(rng, [0, 0, 15, 30, 45]); let count = 0;
       while (count < target && cursor < hrs[1] - 30) {
         const bias = st.bias && st.bias.length ? st.bias : CAT_ORDER.slice(0, 2);
-        const c = pick(rng, bias); const pool = byCat[c] || mains; const svc = pick(rng, pool);
+        const can = (s) => !st.skills || st.skills.includes(s.id);
+        const c = pick(rng, bias); const pool = (byCat[c] || mains).filter(can); const svc = wpick(rng, pool.length ? pool : mains.filter(can).length ? mains.filter(can) : mains);
         const items = [{ serviceId: svc.id, price: svc.price, dur: svc.dur }];
-        if ((T.addonWith || []).includes(svc.cat) && addons.length && chance(rng, 0.35)) { const a = pick(rng, addons); items.push({ serviceId: a.id, price: a.price, dur: a.dur }); }
+        const addPool = addons.filter(can);
+        if ((T.addonWith || []).includes(svc.cat) && addPool.length && chance(rng, 0.35)) { const a = pick(rng, addPool); items.push({ serviceId: a.id, price: a.price, dur: a.dur }); }
         const dur = sum(items, (i) => i.dur);
         if (cursor + dur > hrs[1]) break;
         const ex = existingBy[date + '|' + st.id]; if (ex && ex.some((e) => overlaps(cursor, dur, e.start, e.dur))) { cursor += 15; continue; }
         let client = null;
+        const strict = svc.seedFor === 'men'; const meant = svc.forFlags || strict ? poolFor(svc) : null;
         for (let tries = 0; tries < 40; tries++) {
-          const cand = pickClient(); if (takenToday.has(cand.id)) continue;
+          const cand = meant && meant.length && (strict || (tries < 12 && chance(rng, 0.75))) ? pick(rng, meant) : pickClient(); if (takenToday.has(cand.id)) continue;
+          if (strict && !MEN.has(cand.first)) continue;
+          if (unsafe(cand, svc)) continue;
           const last = lastAppt[cand.id];
           if (last && diffDays(last, date) < Math.min(gapFor(svc.cat), 28)) continue;
           if (off > 0 && last && last > today) continue;

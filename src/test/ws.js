@@ -45,14 +45,14 @@ const TEST_NOW = (() => { const d = new Date(); d.setHours(10, 30, 0, 0); if (d.
       await p.click('[data-act="go"][data-view="clients"]'); await p.click('#client-list .client-row'); await p.waitForTimeout(100); await p.click('[data-act="client-tab"][data-id="health"]'); await p.waitForTimeout(80); await p.screenshot({ path: `${OUT}/37-${id}-health.png` });
     }
   });
-  await t('switch back to Simply Facials, persistence', async () => {
+  await t('switch back to the example studio, persistence', async () => {
     await p.evaluate(() => window.Luster.save()); await p.waitForTimeout(400);
     const list = await p.evaluate(() => window.Luster.workspaces().map((w) => w.name)); if (list.length !== 4) throw new Error('expected 4 workspaces: ' + list.join(','));
-    await p.click('.brand'); await p.waitForSelector('[data-act="ws-switch"]'); const btn = await p.$('[data-act="ws-switch"][data-id="simply"]'); if (!btn) throw new Error('no simply switch button'); await btn.click(); await p.waitForSelector('[data-appt]'); await p.waitForTimeout(300);
-    const brand = await p.textContent('.brand-name'); if (!/Simply Facials/.test(brand)) throw new Error('switch back failed: ' + brand);
+    await p.click('.brand'); await p.waitForSelector('[data-act="ws-switch"]'); const btn = await p.$('[data-act="ws-switch"][data-id="demo"]'); if (!btn) throw new Error('no example-studio switch button'); await btn.click(); await p.waitForSelector('[data-appt]'); await p.waitForTimeout(300);
+    const brand = await p.textContent('.brand-name'); if (!/Glow Theory Skin Studio/.test(brand)) throw new Error('switch back failed: ' + brand);
     await p.reload(); await p.waitForSelector('#rail .nav-item'); await p.waitForTimeout(400);
-    const after = await p.evaluate(() => ({ name: window.Luster.state.business.name, n: window.Luster.workspaces().length, hairKept: window.Luster.workspaces().some((w) => w.name === 'Magnolia Hair Studio') })); if (after.name !== 'Simply Facials' || after.n !== 4 || !after.hairKept) throw new Error('persistence: ' + JSON.stringify(after));
-    await p.click('.brand'); await p.waitForSelector('[data-act="ws-switch"]'); await p.click('[data-act="ws-switch"]:not([data-id="simply"])'); await p.waitForSelector('[data-appt]'); await p.waitForTimeout(300);
+    const after = await p.evaluate(() => ({ name: window.Luster.state.business.name, n: window.Luster.workspaces().length, hairKept: window.Luster.workspaces().some((w) => w.name === 'Magnolia Hair Studio') })); if (after.name !== 'Glow Theory Skin Studio' || after.n !== 4 || !after.hairKept) throw new Error('persistence: ' + JSON.stringify(after));
+    await p.click('.brand'); await p.waitForSelector('[data-act="ws-switch"]'); await p.click('[data-act="ws-switch"]:not([data-id="demo"])'); await p.waitForSelector('[data-appt]'); await p.waitForTimeout(300);
     const kept = await p.evaluate(() => window.Luster.state.business.name); console.log('      switched to', kept);
   });
   await browser.close();

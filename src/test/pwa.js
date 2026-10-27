@@ -21,7 +21,14 @@ const eq = (a, b, what) => { if (a !== b) throw new Error(`${what}: got ${JSON.s
   const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
   await p.goto(base, { waitUntil: 'load' }); await p.waitForSelector('.cal-grid', { timeout: 15000 });
   await t('manifest is the static file with a relative scope', async () => { const m = await p.evaluate(async () => { const l = document.querySelector('link[rel=manifest]'); const r = await fetch(l.href); return { href: l.href, json: await r.json() }; }); if (!m.href.endsWith('/luster/manifest.webmanifest')) throw new Error(m.href); eq(m.json.scope, './', 'scope'); eq(m.json.start_url, './index.html', 'start_url'); });
-  await t('service worker activates with the subpath scope', async () => { const r = await p.evaluate(async () => { const r = await navigator.serviceWorker.ready; return { scope: r.scope, state: (r.active || {}).state }; }); eq(r.scope, base, 'scope'); eq(r.state, 'activated', 'state'); });
+  await t('service worker activates with the subpath scope', async () => {
+    // ready resolves as soon as there is an active worker, which can still be "activating" on a slow machine: wait for the
+    // state change instead of reading it once
+    const r = await p.evaluate(async () => { const r = await navigator.serviceWorker.ready; const w = r.active;
+      if (w && w.state !== 'activated') await new Promise((res) => { const done = () => { if (w.state === 'activated') res(); }; w.addEventListener('statechange', done); setTimeout(res, 10000); done(); });
+      return { scope: r.scope, state: (r.active || {}).state }; });
+    eq(r.scope, base, 'scope'); eq(r.state, 'activated', 'state');
+  });
   await p.waitForTimeout(1200);
   await t('app shell is cached', async () => { const c = await p.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys[0]); return (await c.keys()).length; }); if (c < 8) throw new Error('cached entries: ' + c); });
   await t('offline reload still renders', async () => { await ctx.setOffline(true); await p.reload({ waitUntil: 'load' }).catch(() => {}); await p.waitForSelector('.cal-grid', { timeout: 15000 }); await ctx.setOffline(false); });

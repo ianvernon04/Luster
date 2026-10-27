@@ -1,10 +1,10 @@
 /* ===== Industry templates: everything that makes one kind of business different from another ===== */
-const SEED_VERSION = 11;
+const SEED_VERSION = 13;
 const HISTORY_DAYS = 112; // how far back generated history reaches
-const SLOT_COLORS = ['var(--slot-1)', 'var(--slot-2)', 'var(--slot-3)', 'var(--slot-4)', 'var(--slot-5)'];
+const SLOT_COLORS = ['var(--slot-1)', 'var(--slot-2)', 'var(--slot-3)', 'var(--slot-4)', 'var(--slot-5)', 'var(--slot-6)'];
 /* live category registry for the open workspace (filled by syncCategories) */
 const CATEGORIES = {}; const CAT_ORDER = [];
-function syncCategories(cats) { for (const k of Object.keys(CATEGORIES)) delete CATEGORIES[k]; CAT_ORDER.length = 0; cats.forEach((c, i) => { CATEGORIES[c.id] = { label: c.label, color: SLOT_COLORS[i % 5], slot: i % 5 }; CAT_ORDER.push(c.id); }); }
+function syncCategories(cats) { for (const k of Object.keys(CATEGORIES)) delete CATEGORIES[k]; CAT_ORDER.length = 0; cats.forEach((c, i) => { const n = i % SLOT_COLORS.length; CATEGORIES[c.id] = { label: c.label, color: SLOT_COLORS[n], slot: n }; CAT_ORDER.push(c.id); }); }
 function catDot(k, extra = '') { return `<i class="cat-dot" style="background:${CATEGORIES[k]?.color || 'var(--ink-3)'};${extra}"></i>`; }
 function slugify(s) { return String(s).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'studio'; }
 
@@ -27,6 +27,7 @@ const FLAGS = [
   { k: 'ppd', label: 'Hair-dye allergy', note: 'Patch test 48 hours before any color. PPD-free formula only.', level: 'bad' },
   { k: 'adhesive', label: 'Adhesive sensitivity', note: 'Sensitive adhesive only. Patch test 48 hours before a full set.', level: 'warn' },
   { k: 'acrylate', label: 'Gel / acrylic allergy', note: 'No gel, acrylic, dip or builder products. Regular polish only.', level: 'bad' },
+  { k: 'cold', label: 'Cold sensitivity', note: 'Raynaud’s, cold hives or a cold-related blood disorder (cryoglobulinemia). No cryotherapy or fat freezing; skip ice globes and cold stones.', level: 'bad' },
   { k: 'eye', label: 'Eye condition', note: 'No lash or brow services during an active infection, stye, blepharitis flare or within 2 weeks of eye surgery.', level: 'warn' },
   { k: 'scalp', label: 'Scalp condition', note: 'No chemical services on a broken, inflamed or flaking scalp.', level: 'warn' },
   { k: 'allergy', label: 'Allergy on file', note: '', level: 'warn' },
@@ -38,6 +39,7 @@ const PHOTO_RELEASE = { id: 'photo', name: 'Photo Release', kind: 'consent', tex
 ] };
 
 /* The intake is universal (medical history, medications, allergies, pregnancy, procedures, consents) plus one section that belongs to the vertical. */
+const COLD_CONDITION = 'Cold sensitivity (Raynaud’s, cold hives, cryoglobulinemia)';   // rules out cryotherapy; book/intake.js flags it as 'cold'
 function intakeTemplate(T) {
   const C = 'Cancer (current or past)';
   return { id: 'intake', name: 'New Client Intake & Health History', kind: 'intake', estMinutes: 6, fields: [
@@ -48,7 +50,7 @@ function intakeTemplate(T) {
     { id: 'referral', label: 'How did you hear about us?', type: 'choice', options: ['Instagram', 'TikTok', 'Google', 'Friend or family', 'Walked by', 'Website', 'Other'] },
 
     { type: 'section', label: 'Medical history', desc: 'Everything here stays in your private file. It decides which services are safe for you.' },
-    { id: 'conditions', label: 'Do you have, or have you had, any of the following?', type: 'multi', options: [C, 'Diabetes', 'Autoimmune disorder (lupus, RA, MS…)', 'Thyroid condition', 'Heart condition or high blood pressure', 'Pacemaker or metal implants', 'Epilepsy or seizures', 'Bleeding or clotting disorder', 'Blood clots or DVT', 'Hepatitis or HIV', 'Cold sores (herpes simplex)', 'Eczema, psoriasis or dermatitis', 'Rosacea', 'Keloid or raised scarring', 'Neuromuscular disorder (MG, ALS…)', 'Recent surgery (last 6 months)', 'Asthma', 'None of these'] },
+    { id: 'conditions', label: 'Do you have, or have you had, any of the following?', type: 'multi', options: [C, 'Diabetes', 'Autoimmune disorder (lupus, RA, MS…)', 'Thyroid condition', 'Heart condition or high blood pressure', 'Pacemaker or metal implants', 'Epilepsy or seizures', 'Bleeding or clotting disorder', 'Blood clots or DVT', 'Hepatitis or HIV', 'Cold sores (herpes simplex)', 'Eczema, psoriasis or dermatitis', 'Rosacea', 'Keloid or raised scarring', 'Neuromuscular disorder (MG, ALS…)', 'Recent surgery (last 6 months)', COLD_CONDITION, 'Asthma', 'None of these'] },
     { id: 'cancer_type', label: 'Type of cancer', type: 'text', placeholder: 'e.g. breast, skin, lymphoma', showIf: { field: 'conditions', includes: C } },
     { id: 'cancer_status', label: 'Where are you in treatment?', type: 'choice', options: ['In treatment now', 'Finished within the last 12 months', 'In remission over a year', 'Monitoring only'], showIf: { field: 'conditions', includes: C } },
     { id: 'cancer_tx', label: 'Treatments received or planned', type: 'multi', options: ['Chemotherapy', 'Radiation', 'Surgery', 'Immunotherapy', 'Hormone therapy', 'Targeted therapy', 'None yet'], showIf: { field: 'conditions', includes: C } },
@@ -102,10 +104,10 @@ const TEMPLATES = {
   facial: {
     id: 'facial', label: 'Facial & skin studio', blurb: 'Estheticians: facials, peels, dermaplaning, lashes and brows.', icon: 'spark',
     noun: { pro: 'esthetician', pros: 'estheticians', visit: 'facial', visits: 'facials' },
-    defaults: { name: 'Simply Facials', phone: '(225) 555-0142', address: '4316 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.0995, exampleName: 'Glow Theory Skin Studio' },
+    defaults: { name: 'Glow Theory Skin Studio', phone: '(225) 555-0142', address: '4316 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.105, exampleName: 'Magnolia Skin Studio' },
     categories: [{ id: 'facial', label: 'Facials' }, { id: 'advanced', label: 'Advanced' }, { id: 'wax', label: 'Waxing' }, { id: 'brow', label: 'Lashes & Brows' }, { id: 'addon', label: 'Add-ons' }],
     services: [
-      { id: 'sv_sig', name: 'Simply Signature Facial', cat: 'facial', dur: 60, price: 95, desc: 'Deep cleanse, exfoliation, extractions, custom mask and massage. Our most-booked facial.' },
+      { id: 'sv_sig', name: 'Signature Facial', cat: 'facial', dur: 60, price: 95, desc: 'Deep cleanse, exfoliation, extractions, custom mask and massage. Our most-booked facial.' },
       { id: 'sv_express', name: 'Express Glow Facial', cat: 'facial', dur: 30, price: 55, desc: 'Lunch-break reset. Cleanse, enzyme exfoliation, hydrating mask.' },
       { id: 'sv_acne', name: 'Clarifying Acne Facial', cat: 'facial', dur: 60, price: 105, desc: 'Salicylic cleanse, high-frequency, targeted extractions, calming mask.' },
       { id: 'sv_age', name: 'Age-Defying Facial', cat: 'facial', dur: 75, price: 130, desc: 'Peptide infusion, lymphatic massage, LED finish.' },
@@ -132,7 +134,7 @@ const TEMPLATES = {
       { id: 'sv_ledadd', name: 'LED Add-on', cat: 'addon', dur: 15, price: 25, addon: true, desc: '' },
     ],
     products: [
-      { id: 'pr_cleanser', name: 'Simply Gentle Cleanser', price: 32, stock: 14 }, { id: 'pr_vitc', name: 'Vitamin C Brightening Serum', price: 68, stock: 9 }, { id: 'pr_spf', name: 'Daily Mineral SPF 40', price: 38, stock: 22 }, { id: 'pr_mist', name: 'Hyaluronic Hydrating Mist', price: 24, stock: 17 }, { id: 'pr_retinol', name: 'Retinol Renewal Night Cream', price: 72, stock: 6 }, { id: 'pr_lip', name: 'Overnight Lip Mask', price: 18, stock: 25 }, { id: 'pr_enzyme', name: 'Enzyme Exfoliating Mask', price: 44, stock: 3 }, { id: 'pr_balm', name: 'Soothing Barrier Balm', price: 36, stock: 11 },
+      { id: 'pr_cleanser', name: 'Gentle Cream Cleanser', price: 32, stock: 14 }, { id: 'pr_vitc', name: 'Vitamin C Brightening Serum', price: 68, stock: 9 }, { id: 'pr_spf', name: 'Daily Mineral SPF 40', price: 38, stock: 22 }, { id: 'pr_mist', name: 'Hyaluronic Hydrating Mist', price: 24, stock: 17 }, { id: 'pr_retinol', name: 'Retinol Renewal Night Cream', price: 72, stock: 6 }, { id: 'pr_lip', name: 'Overnight Lip Mask', price: 18, stock: 25 }, { id: 'pr_enzyme', name: 'Enzyme Exfoliating Mask', price: 44, stock: 3 }, { id: 'pr_balm', name: 'Soothing Barrier Balm', price: 36, stock: 11 },
     ],
     plans: [
       { id: 'pl_glow', name: 'Glow Club', price: 79, perks: ['One Signature or Express facial every month', '10% off retail', '$15 add-ons', 'Unused visits roll over 60 days'], includes: ['sv_sig', 'sv_express'], retailDiscount: 0.10 },
@@ -164,8 +166,9 @@ const TEMPLATES = {
     consents: [
       consent('peel', 'Chemical Peel Consent', 'A chemical peel applies an acid solution to exfoliate the outer layers of skin. Expected effects include redness, tightness, sensitivity and visible flaking for 3–7 days. Rare effects include prolonged redness, hyperpigmentation, blistering or infection. Risks increase with recent retinoid or Accutane use, sun exposure, and picking at peeling skin.', ['I understand I may experience redness, tightness and flaking for 3–7 days.', 'I will avoid retinoids, exfoliants and direct sun for 7 days and wear SPF daily.', 'I have disclosed all medications, including any Accutane use in the last 12 months.']),
       consent('dermaplaning', 'Dermaplaning Consent', 'Dermaplaning uses a sterile, single-use blade to exfoliate the outermost layer of dead skin and remove vellus hair (peach fuzz). Expect mild redness and sensitivity for a few hours, and occasionally a small nick. Rare effects include breakouts, whiteheads, irritation or dark marks if the skin is exposed to sun afterward. Hair does not grow back thicker or darker. Not performed on active acne or open lesions, during a cold-sore outbreak, on sunburned skin, within 6 months of Accutane, or within 5 days of retinoid use.', ['I understand I may have mild redness and sensitivity for up to 24 hours, and that small nicks can occur.', 'I have not used Accutane in the last 6 months, have paused retinoids for 5 days, and have no active breakouts, cold sores or open skin in the treatment area.', 'I will avoid sun, heat, sweating, exfoliants and makeup for 24 hours and wear SPF daily afterward.']),
+      consent('microneedling', 'Microneedling & Microchanneling Consent', 'Microneedling and microchanneling use fine, sterile needles to make thousands of tiny channels in the skin. That sets off the skin\'s own repair (new collagen and elastin) and lets serums absorb deeper. Expect redness, warmth and tightness for 24–48 hours, like a mild sunburn, and sometimes pinpoint bleeding or light flaking. Rare effects include bruising, breakouts, infection, a cold-sore flare-up and changes in pigment. It isn\'t done during pregnancy, within 6 months of Accutane, on keloid-prone skin, or over active acne, cold sores, sunburn or broken skin.', ['I understand I may be red, warm and tight for 24–48 hours, and that pinpoint bleeding, bruising or a breakout can happen.', 'I am not pregnant, have not taken Accutane in the last 6 months, and have no active breakouts, cold sores, sunburn or broken skin in the treatment area.', 'For 24 hours I will skip makeup, workouts, sun and actives (retinol, acids), and I will wear SPF every day afterward.']),
     ],
-    consentFor: { sv_peel: 'peel', sv_derma: 'dermaplaning', sv_dermaadd: 'dermaplaning' },
+    consentFor: { sv_peel: 'peel', sv_derma: 'dermaplaning', sv_dermaadd: 'dermaplaning', sv_micro: 'microneedling' },
     contra: [
       { flag: 'oncology', services: ['sv_peel', 'sv_micro', 'sv_mdb', 'sv_derma', 'sv_dermaadd', 'sv_hydra', 'sv_acne', 'sv_extract'], cats: ['wax'], level: 'bad', text: 'Oncology client — needs written physician clearance; no peels, needling, microderm, dermaplaning, waxing or heat during treatment.' },
       { flag: 'pregnant', services: ['sv_peel', 'sv_micro', 'sv_led', 'sv_ledadd', 'sv_acne'], cats: [], level: 'bad', text: 'Pregnant or nursing — no peels, microneedling, LED or high-frequency; skip salicylic and retinol products.' },
@@ -195,7 +198,7 @@ const TEMPLATES = {
   hair: {
     id: 'hair', label: 'Hair salon', blurb: 'Stylists and colorists: cuts, color, balayage, treatments, styling.', icon: 'spark',
     noun: { pro: 'stylist', pros: 'stylists', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Main Street Hair Co.', phone: '(225) 555-0188', address: '2210 Government St, Baton Rouge, LA 70806', taxRate: 0.0995, exampleName: 'Main Street Hair Co.' },
+    defaults: { name: 'Main Street Hair Co.', phone: '(225) 555-0188', address: '2210 Government St, Baton Rouge, LA 70806', taxRate: 0.105, exampleName: 'Main Street Hair Co.' },
     categories: [{ id: 'cut', label: 'Cuts' }, { id: 'color', label: 'Color' }, { id: 'treat', label: 'Treatments' }, { id: 'style', label: 'Styling' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'h_wcut', name: 'Women\'s Cut & Style', cat: 'cut', dur: 60, price: 65, desc: 'Consultation, shampoo, precision cut, blow-dry.' }, { id: 'h_mcut', name: 'Men\'s Cut', cat: 'cut', dur: 30, price: 35, desc: 'Clipper or scissor cut with hot towel finish.' }, { id: 'h_kids', name: 'Kids Cut (12 & under)', cat: 'cut', dur: 30, price: 25, desc: '' }, { id: 'h_bang', name: 'Bang Trim', cat: 'cut', dur: 15, price: 15, desc: '' },
@@ -249,7 +252,7 @@ const TEMPLATES = {
   lash: {
     id: 'lash', label: 'Lash & brow studio', blurb: 'Extensions, fills, lifts, laminations, tints and waxing.', icon: 'spark',
     noun: { pro: 'artist', pros: 'artists', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Lashed & Lifted Studio', phone: '(225) 555-0171', address: '7520 Jefferson Hwy, Baton Rouge, LA 70809', taxRate: 0.0995, exampleName: 'Lashed & Lifted Studio' },
+    defaults: { name: 'Lashed & Lifted Studio', phone: '(225) 555-0171', address: '7520 Jefferson Hwy, Baton Rouge, LA 70809', taxRate: 0.105, exampleName: 'Lashed & Lifted Studio' },
     categories: [{ id: 'ext', label: 'Lash extensions' }, { id: 'lift', label: 'Lifts & laminations' }, { id: 'brow', label: 'Brows' }, { id: 'wax', label: 'Waxing' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'l_classic', name: 'Classic Full Set', cat: 'ext', dur: 120, price: 150, desc: 'One extension per natural lash. Natural mascara look. Consent form required.' }, { id: 'l_hybrid', name: 'Hybrid Full Set', cat: 'ext', dur: 135, price: 180, desc: 'Classic and volume mixed. Consent form required.' }, { id: 'l_volume', name: 'Volume Full Set', cat: 'ext', dur: 150, price: 220, desc: 'Handmade fans, fluffy and full. Consent form required.' }, { id: 'l_cfill', name: 'Classic Fill (2–3 wks)', cat: 'ext', dur: 60, price: 65, desc: 'At least 40% of lashes remaining.' }, { id: 'l_vfill', name: 'Volume Fill (2–3 wks)', cat: 'ext', dur: 75, price: 85, desc: '' }, { id: 'l_removal', name: 'Lash Removal', cat: 'ext', dur: 30, price: 25, desc: 'Gentle cream remover. Free with a new set.' },
@@ -305,7 +308,7 @@ const TEMPLATES = {
   nails: {
     id: 'nails', label: 'Nail salon', blurb: 'Manicures, pedicures, gel, acrylic, dip and nail art.', icon: 'spark',
     noun: { pro: 'nail tech', pros: 'nail techs', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Polished Nail Bar', phone: '(225) 555-0160', address: '3535 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.0995, exampleName: 'Polished Nail Bar' },
+    defaults: { name: 'Polished Nail Bar', phone: '(225) 555-0160', address: '3535 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.105, exampleName: 'Polished Nail Bar' },
     categories: [{ id: 'mani', label: 'Manicures' }, { id: 'pedi', label: 'Pedicures' }, { id: 'enh', label: 'Enhancements' }, { id: 'art', label: 'Nail art' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'n_cmani', name: 'Classic Manicure', cat: 'mani', dur: 30, price: 25, desc: 'Shape, cuticles, massage, regular polish.' }, { id: 'n_gmani', name: 'Gel Manicure', cat: 'mani', dur: 45, price: 40, desc: 'Chip-free for 2–3 weeks.' }, { id: 'n_spamani', name: 'Spa Manicure', cat: 'mani', dur: 45, price: 38, desc: 'Scrub, mask, extended massage, regular polish.' },
@@ -359,7 +362,7 @@ const TEMPLATES = {
   massage: {
     id: 'massage', label: 'Massage & wellness', blurb: 'Massage therapists: Swedish, deep tissue, prenatal, hot stone, body treatments.', icon: 'spark',
     noun: { pro: 'therapist', pros: 'therapists', visit: 'session', visits: 'sessions' },
-    defaults: { name: 'Still Water Massage', phone: '(225) 555-0195', address: '8800 Bluebonnet Blvd, Baton Rouge, LA 70810', taxRate: 0.0995, exampleName: 'Still Water Massage' },
+    defaults: { name: 'Still Water Massage', phone: '(225) 555-0195', address: '8800 Bluebonnet Blvd, Baton Rouge, LA 70810', taxRate: 0.105, exampleName: 'Still Water Massage' },
     categories: [{ id: 'massage', label: 'Massage' }, { id: 'spec', label: 'Specialty' }, { id: 'body', label: 'Body treatments' }, { id: 'wellness', label: 'Wellness' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'm_sw60', name: 'Swedish Massage · 60', cat: 'massage', dur: 60, price: 90, desc: 'Relaxation with light to medium pressure.' }, { id: 'm_sw90', name: 'Swedish Massage · 90', cat: 'massage', dur: 90, price: 130, desc: '' }, { id: 'm_dt60', name: 'Deep Tissue · 60', cat: 'massage', dur: 60, price: 105, desc: 'Focused, firm work on chronic tension.' }, { id: 'm_dt90', name: 'Deep Tissue · 90', cat: 'massage', dur: 90, price: 150, desc: '' },
@@ -416,7 +419,7 @@ const TEMPLATES = {
   medspa: {
     id: 'medspa', label: 'Med spa', blurb: 'Injectables, laser, medical-grade skin and body contouring under a medical director.', icon: 'spark',
     noun: { pro: 'provider', pros: 'providers', visit: 'treatment', visits: 'treatments' },
-    defaults: { name: 'Meridian Aesthetics', phone: '(225) 555-0130', address: '10000 Perkins Rowe, Baton Rouge, LA 70810', taxRate: 0.0995, exampleName: 'Meridian Aesthetics' },
+    defaults: { name: 'Meridian Aesthetics', phone: '(225) 555-0130', address: '10000 Perkins Rowe, Baton Rouge, LA 70810', taxRate: 0.105, exampleName: 'Meridian Aesthetics' },
     categories: [{ id: 'inject', label: 'Injectables' }, { id: 'laser', label: 'Laser & light' }, { id: 'skin', label: 'Skin' }, { id: 'body', label: 'Body' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'ms_tox20', name: 'Neurotoxin · 20 units', cat: 'inject', dur: 30, price: 260, desc: 'Botox, Dysport or Xeomin. Consent form required.' }, { id: 'ms_tox40', name: 'Neurotoxin · 40 units', cat: 'inject', dur: 30, price: 500, desc: 'Three areas. Consent form required.' }, { id: 'ms_lip', name: 'Lip Filler · 1 syringe', cat: 'inject', dur: 45, price: 650, desc: 'Hyaluronic acid filler. Consent form required.' }, { id: 'ms_cheek', name: 'Cheek or Jaw Filler · 1 syringe', cat: 'inject', dur: 45, price: 750, desc: 'Consent form required.' }, { id: 'ms_consult', name: 'Injectable Consultation', cat: 'inject', dur: 20, price: 0, desc: 'Free. Required before first injectable.' },
@@ -461,6 +464,7 @@ const TEMPLATES = {
       { flag: 'autoimmune', services: ['ms_lip', 'ms_cheek', 'ms_rf', 'ms_prp', 'ms_peel'], cats: [], level: 'warn', text: 'Autoimmune condition — higher nodule and reactivity risk; medical director review before filler or needling.' },
       { flag: 'pacemaker', services: ['ms_rf', 'ms_emsculpt', 'ms_cool'], cats: [], level: 'bad', text: 'Pacemaker or implant — no radiofrequency or electromagnetic devices.' },
       { flag: 'diabetes', services: ['ms_rf', 'ms_prp', 'ms_peel', 'ms_cool'], cats: [], level: 'warn', text: 'Diabetes — slower healing; confirm control before needling, peels or contouring.' },
+      { flag: 'cold', services: ['ms_cool'], cats: [], level: 'bad', text: 'Cold sensitivity (Raynaud’s, cold hives, cryoglobulinemia) — no fat freezing.' },
     ],
     intake: { occupationHint: 'Sun exposure matters for laser and pigment treatments', pressureLabel: 'Pressure during facials', routineOptions: ['Cleanser', 'Medical retinol or tretinoin', 'Vitamin C', 'Hydroquinone', 'Acids (AHA / BHA)', 'Growth factors', 'SPF daily', 'Nothing yet'],
       section: { label: 'Your treatments', desc: 'What you have had done and where you want to go.', fields: [
@@ -480,7 +484,7 @@ const TEMPLATES = {
   barber: {
     id: 'barber', label: 'Barbershop', blurb: 'Cuts, fades, beards, hot-towel shaves, grey blending.', icon: 'spark',
     noun: { pro: 'barber', pros: 'barbers', visit: 'cut', visits: 'cuts' },
-    defaults: { name: 'Capitol Barber Co.', phone: '(225) 555-0112', address: '450 Laurel St, Baton Rouge, LA 70801', taxRate: 0.0995, exampleName: 'Capitol Barber Co.' },
+    defaults: { name: 'Capitol Barber Co.', phone: '(225) 555-0112', address: '450 Laurel St, Baton Rouge, LA 70801', taxRate: 0.105, exampleName: 'Capitol Barber Co.' },
     categories: [{ id: 'cut', label: 'Cuts' }, { id: 'shave', label: 'Shaves' }, { id: 'beard', label: 'Beard' }, { id: 'color', label: 'Color & treatments' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'b_classic', name: 'Classic Cut', cat: 'cut', dur: 30, price: 30, desc: 'Scissor or clipper, hot towel finish.' }, { id: 'b_fade', name: 'Skin Fade', cat: 'cut', dur: 45, price: 40, desc: 'Razor-tight fade, blended to the top.' }, { id: 'b_cutbeard', name: 'Cut + Beard', cat: 'cut', dur: 60, price: 55, desc: 'Our most-booked combo.' }, { id: 'b_kids', name: 'Kids Cut (12 & under)', cat: 'cut', dur: 30, price: 20, desc: '' }, { id: 'b_lineup', name: 'Line-up', cat: 'cut', dur: 15, price: 15, desc: 'Edges and neckline only.' }, { id: 'b_headshave', name: 'Head Shave', cat: 'shave', dur: 30, price: 30, desc: 'Hot towel, straight razor. Consent form required.' },

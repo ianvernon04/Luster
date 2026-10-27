@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Luster">
 <meta name="description" content="Front-desk software for salons, spas and studios.">
-<meta name="luster-build" content="441e3e7001 2026-10-26T12:51Z">
+<meta name="luster-build" content="708860d1c9 2026-10-27T01:13Z">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -45,7 +45,7 @@
   --bad:  #B23A30; --bad-soft:  #F9E3E0; --bad-ink: #8C2A22;
   --info-soft: #E7EEF6;
   /* service categories = validated chart slots (aqua, violet, yellow, magenta, blue) */
-  --slot-1: #1baf7a; --slot-2: #6250d6; --slot-3: #eda100; --slot-4: #e87ba4; --slot-5: #2a78d6;
+  --slot-1: #1baf7a; --slot-2: #6250d6; --slot-3: #eda100; --slot-4: #e87ba4; --slot-5: #2a78d6; --slot-6: #0f9ab0;
   --chart-grid: #E6E4DD; --chart-axis: #C9C6BD; --chart-muted: #8A9399;
   --scrim: rgba(27,34,36,0.42);
   --shadow-1: 0 1px 2px rgba(27,34,36,0.06);
@@ -65,7 +65,7 @@
     --warn: #DCA94E; --warn-soft: #3A2E15; --warn-ink: #F0C97E;
     --bad: #E27C72; --bad-soft: #3D1F1C; --bad-ink: #F2A49C;
     --info-soft: #1F2C3A;
-    --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5;
+    --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5; --slot-6: #2fb7cc;
     --chart-grid: #2A3337; --chart-axis: #3A464B; --chart-muted: #7E888D;
     --scrim: rgba(0,0,0,0.6);
     --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
@@ -82,7 +82,7 @@
   --warn: #DCA94E; --warn-soft: #3A2E15; --warn-ink: #F0C97E;
   --bad: #E27C72; --bad-soft: #3D1F1C; --bad-ink: #F2A49C;
   --info-soft: #1F2C3A;
-  --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5;
+  --slot-1: #199e70; --slot-2: #9085e9; --slot-3: #c98500; --slot-4: #d55181; --slot-5: #3987e5; --slot-6: #2fb7cc;
   --chart-grid: #2A3337; --chart-axis: #3A464B; --chart-muted: #7E888D;
   --scrim: rgba(0,0,0,0.6);
   --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
@@ -671,6 +671,7 @@ function deriveIntake(a, verticalFields, today) {
   for (const f of verticalFields || []) { if (!f.flag) continue; const v = a[f.id]; const hit = Array.isArray(v) ? v.includes(f.flag.when) : v === f.flag.when; if (hit) flags.add(f.flag.k); }
   if (alg.includes('Hair dye (PPD)')) flags.add('ppd'); if (alg.includes('Acrylates (gel or acrylic nails)')) flags.add('acrylate'); if (alg.includes('Adhesives (lash glue, tape)')) flags.add('adhesive');
   if (cond.includes('Blood clots or DVT')) flags.add('dvt'); if (cond.some((x) => x.startsWith('Neuromuscular'))) flags.add('neuro'); if (cond.some((x) => x.startsWith('Recent surgery'))) flags.add('surgery');
+  if (cond.some((x) => x.startsWith('Cold sensitivity'))) flags.add('cold');
   const allergies = alg.filter((x) => x !== 'None known' && x !== 'Seasonal allergies').concat(a.allergies_other ? [a.allergies_other] : []);
   if (allergies.length) flags.add('allergy');
   const cancer = cond.includes('Cancer (current or past)') ? { type: a.cancer_type || '', status: a.cancer_status || '', tx: a.cancer_tx || [], radiationArea: a.cancer_radiation_area || '', lymph: a.cancer_lymph || '', port: a.cancer_port || '', effects: a.cancer_effects || [], clearance: a.cancer_clearance || 'Not yet', physician: a.cancer_physician || '' } : null;
@@ -855,12 +856,12 @@ function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTi
 
 /* ---- parts/31-templates.js ---- */
 /* ===== Industry templates: everything that makes one kind of business different from another ===== */
-const SEED_VERSION = 11;
+const SEED_VERSION = 13;
 const HISTORY_DAYS = 112; // how far back generated history reaches
-const SLOT_COLORS = ['var(--slot-1)', 'var(--slot-2)', 'var(--slot-3)', 'var(--slot-4)', 'var(--slot-5)'];
+const SLOT_COLORS = ['var(--slot-1)', 'var(--slot-2)', 'var(--slot-3)', 'var(--slot-4)', 'var(--slot-5)', 'var(--slot-6)'];
 /* live category registry for the open workspace (filled by syncCategories) */
 const CATEGORIES = {}; const CAT_ORDER = [];
-function syncCategories(cats) { for (const k of Object.keys(CATEGORIES)) delete CATEGORIES[k]; CAT_ORDER.length = 0; cats.forEach((c, i) => { CATEGORIES[c.id] = { label: c.label, color: SLOT_COLORS[i % 5], slot: i % 5 }; CAT_ORDER.push(c.id); }); }
+function syncCategories(cats) { for (const k of Object.keys(CATEGORIES)) delete CATEGORIES[k]; CAT_ORDER.length = 0; cats.forEach((c, i) => { const n = i % SLOT_COLORS.length; CATEGORIES[c.id] = { label: c.label, color: SLOT_COLORS[n], slot: n }; CAT_ORDER.push(c.id); }); }
 function catDot(k, extra = '') { return `<i class="cat-dot" style="background:${CATEGORIES[k]?.color || 'var(--ink-3)'};${extra}"></i>`; }
 function slugify(s) { return String(s).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'studio'; }
 
@@ -883,6 +884,7 @@ const FLAGS = [
   { k: 'ppd', label: 'Hair-dye allergy', note: 'Patch test 48 hours before any color. PPD-free formula only.', level: 'bad' },
   { k: 'adhesive', label: 'Adhesive sensitivity', note: 'Sensitive adhesive only. Patch test 48 hours before a full set.', level: 'warn' },
   { k: 'acrylate', label: 'Gel / acrylic allergy', note: 'No gel, acrylic, dip or builder products. Regular polish only.', level: 'bad' },
+  { k: 'cold', label: 'Cold sensitivity', note: 'Raynaud’s, cold hives or a cold-related blood disorder (cryoglobulinemia). No cryotherapy or fat freezing; skip ice globes and cold stones.', level: 'bad' },
   { k: 'eye', label: 'Eye condition', note: 'No lash or brow services during an active infection, stye, blepharitis flare or within 2 weeks of eye surgery.', level: 'warn' },
   { k: 'scalp', label: 'Scalp condition', note: 'No chemical services on a broken, inflamed or flaking scalp.', level: 'warn' },
   { k: 'allergy', label: 'Allergy on file', note: '', level: 'warn' },
@@ -894,6 +896,7 @@ const PHOTO_RELEASE = { id: 'photo', name: 'Photo Release', kind: 'consent', tex
 ] };
 
 /* The intake is universal (medical history, medications, allergies, pregnancy, procedures, consents) plus one section that belongs to the vertical. */
+const COLD_CONDITION = 'Cold sensitivity (Raynaud’s, cold hives, cryoglobulinemia)';   // rules out cryotherapy; book/intake.js flags it as 'cold'
 function intakeTemplate(T) {
   const C = 'Cancer (current or past)';
   return { id: 'intake', name: 'New Client Intake & Health History', kind: 'intake', estMinutes: 6, fields: [
@@ -904,7 +907,7 @@ function intakeTemplate(T) {
     { id: 'referral', label: 'How did you hear about us?', type: 'choice', options: ['Instagram', 'TikTok', 'Google', 'Friend or family', 'Walked by', 'Website', 'Other'] },
 
     { type: 'section', label: 'Medical history', desc: 'Everything here stays in your private file. It decides which services are safe for you.' },
-    { id: 'conditions', label: 'Do you have, or have you had, any of the following?', type: 'multi', options: [C, 'Diabetes', 'Autoimmune disorder (lupus, RA, MS…)', 'Thyroid condition', 'Heart condition or high blood pressure', 'Pacemaker or metal implants', 'Epilepsy or seizures', 'Bleeding or clotting disorder', 'Blood clots or DVT', 'Hepatitis or HIV', 'Cold sores (herpes simplex)', 'Eczema, psoriasis or dermatitis', 'Rosacea', 'Keloid or raised scarring', 'Neuromuscular disorder (MG, ALS…)', 'Recent surgery (last 6 months)', 'Asthma', 'None of these'] },
+    { id: 'conditions', label: 'Do you have, or have you had, any of the following?', type: 'multi', options: [C, 'Diabetes', 'Autoimmune disorder (lupus, RA, MS…)', 'Thyroid condition', 'Heart condition or high blood pressure', 'Pacemaker or metal implants', 'Epilepsy or seizures', 'Bleeding or clotting disorder', 'Blood clots or DVT', 'Hepatitis or HIV', 'Cold sores (herpes simplex)', 'Eczema, psoriasis or dermatitis', 'Rosacea', 'Keloid or raised scarring', 'Neuromuscular disorder (MG, ALS…)', 'Recent surgery (last 6 months)', COLD_CONDITION, 'Asthma', 'None of these'] },
     { id: 'cancer_type', label: 'Type of cancer', type: 'text', placeholder: 'e.g. breast, skin, lymphoma', showIf: { field: 'conditions', includes: C } },
     { id: 'cancer_status', label: 'Where are you in treatment?', type: 'choice', options: ['In treatment now', 'Finished within the last 12 months', 'In remission over a year', 'Monitoring only'], showIf: { field: 'conditions', includes: C } },
     { id: 'cancer_tx', label: 'Treatments received or planned', type: 'multi', options: ['Chemotherapy', 'Radiation', 'Surgery', 'Immunotherapy', 'Hormone therapy', 'Targeted therapy', 'None yet'], showIf: { field: 'conditions', includes: C } },
@@ -958,10 +961,10 @@ const TEMPLATES = {
   facial: {
     id: 'facial', label: 'Facial & skin studio', blurb: 'Estheticians: facials, peels, dermaplaning, lashes and brows.', icon: 'spark',
     noun: { pro: 'esthetician', pros: 'estheticians', visit: 'facial', visits: 'facials' },
-    defaults: { name: 'Simply Facials', phone: '(225) 555-0142', address: '4316 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.0995, exampleName: 'Glow Theory Skin Studio' },
+    defaults: { name: 'Glow Theory Skin Studio', phone: '(225) 555-0142', address: '4316 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.105, exampleName: 'Magnolia Skin Studio' },
     categories: [{ id: 'facial', label: 'Facials' }, { id: 'advanced', label: 'Advanced' }, { id: 'wax', label: 'Waxing' }, { id: 'brow', label: 'Lashes & Brows' }, { id: 'addon', label: 'Add-ons' }],
     services: [
-      { id: 'sv_sig', name: 'Simply Signature Facial', cat: 'facial', dur: 60, price: 95, desc: 'Deep cleanse, exfoliation, extractions, custom mask and massage. Our most-booked facial.' },
+      { id: 'sv_sig', name: 'Signature Facial', cat: 'facial', dur: 60, price: 95, desc: 'Deep cleanse, exfoliation, extractions, custom mask and massage. Our most-booked facial.' },
       { id: 'sv_express', name: 'Express Glow Facial', cat: 'facial', dur: 30, price: 55, desc: 'Lunch-break reset. Cleanse, enzyme exfoliation, hydrating mask.' },
       { id: 'sv_acne', name: 'Clarifying Acne Facial', cat: 'facial', dur: 60, price: 105, desc: 'Salicylic cleanse, high-frequency, targeted extractions, calming mask.' },
       { id: 'sv_age', name: 'Age-Defying Facial', cat: 'facial', dur: 75, price: 130, desc: 'Peptide infusion, lymphatic massage, LED finish.' },
@@ -988,7 +991,7 @@ const TEMPLATES = {
       { id: 'sv_ledadd', name: 'LED Add-on', cat: 'addon', dur: 15, price: 25, addon: true, desc: '' },
     ],
     products: [
-      { id: 'pr_cleanser', name: 'Simply Gentle Cleanser', price: 32, stock: 14 }, { id: 'pr_vitc', name: 'Vitamin C Brightening Serum', price: 68, stock: 9 }, { id: 'pr_spf', name: 'Daily Mineral SPF 40', price: 38, stock: 22 }, { id: 'pr_mist', name: 'Hyaluronic Hydrating Mist', price: 24, stock: 17 }, { id: 'pr_retinol', name: 'Retinol Renewal Night Cream', price: 72, stock: 6 }, { id: 'pr_lip', name: 'Overnight Lip Mask', price: 18, stock: 25 }, { id: 'pr_enzyme', name: 'Enzyme Exfoliating Mask', price: 44, stock: 3 }, { id: 'pr_balm', name: 'Soothing Barrier Balm', price: 36, stock: 11 },
+      { id: 'pr_cleanser', name: 'Gentle Cream Cleanser', price: 32, stock: 14 }, { id: 'pr_vitc', name: 'Vitamin C Brightening Serum', price: 68, stock: 9 }, { id: 'pr_spf', name: 'Daily Mineral SPF 40', price: 38, stock: 22 }, { id: 'pr_mist', name: 'Hyaluronic Hydrating Mist', price: 24, stock: 17 }, { id: 'pr_retinol', name: 'Retinol Renewal Night Cream', price: 72, stock: 6 }, { id: 'pr_lip', name: 'Overnight Lip Mask', price: 18, stock: 25 }, { id: 'pr_enzyme', name: 'Enzyme Exfoliating Mask', price: 44, stock: 3 }, { id: 'pr_balm', name: 'Soothing Barrier Balm', price: 36, stock: 11 },
     ],
     plans: [
       { id: 'pl_glow', name: 'Glow Club', price: 79, perks: ['One Signature or Express facial every month', '10% off retail', '$15 add-ons', 'Unused visits roll over 60 days'], includes: ['sv_sig', 'sv_express'], retailDiscount: 0.10 },
@@ -1020,8 +1023,9 @@ const TEMPLATES = {
     consents: [
       consent('peel', 'Chemical Peel Consent', 'A chemical peel applies an acid solution to exfoliate the outer layers of skin. Expected effects include redness, tightness, sensitivity and visible flaking for 3–7 days. Rare effects include prolonged redness, hyperpigmentation, blistering or infection. Risks increase with recent retinoid or Accutane use, sun exposure, and picking at peeling skin.', ['I understand I may experience redness, tightness and flaking for 3–7 days.', 'I will avoid retinoids, exfoliants and direct sun for 7 days and wear SPF daily.', 'I have disclosed all medications, including any Accutane use in the last 12 months.']),
       consent('dermaplaning', 'Dermaplaning Consent', 'Dermaplaning uses a sterile, single-use blade to exfoliate the outermost layer of dead skin and remove vellus hair (peach fuzz). Expect mild redness and sensitivity for a few hours, and occasionally a small nick. Rare effects include breakouts, whiteheads, irritation or dark marks if the skin is exposed to sun afterward. Hair does not grow back thicker or darker. Not performed on active acne or open lesions, during a cold-sore outbreak, on sunburned skin, within 6 months of Accutane, or within 5 days of retinoid use.', ['I understand I may have mild redness and sensitivity for up to 24 hours, and that small nicks can occur.', 'I have not used Accutane in the last 6 months, have paused retinoids for 5 days, and have no active breakouts, cold sores or open skin in the treatment area.', 'I will avoid sun, heat, sweating, exfoliants and makeup for 24 hours and wear SPF daily afterward.']),
+      consent('microneedling', 'Microneedling & Microchanneling Consent', 'Microneedling and microchanneling use fine, sterile needles to make thousands of tiny channels in the skin. That sets off the skin\'s own repair (new collagen and elastin) and lets serums absorb deeper. Expect redness, warmth and tightness for 24–48 hours, like a mild sunburn, and sometimes pinpoint bleeding or light flaking. Rare effects include bruising, breakouts, infection, a cold-sore flare-up and changes in pigment. It isn\'t done during pregnancy, within 6 months of Accutane, on keloid-prone skin, or over active acne, cold sores, sunburn or broken skin.', ['I understand I may be red, warm and tight for 24–48 hours, and that pinpoint bleeding, bruising or a breakout can happen.', 'I am not pregnant, have not taken Accutane in the last 6 months, and have no active breakouts, cold sores, sunburn or broken skin in the treatment area.', 'For 24 hours I will skip makeup, workouts, sun and actives (retinol, acids), and I will wear SPF every day afterward.']),
     ],
-    consentFor: { sv_peel: 'peel', sv_derma: 'dermaplaning', sv_dermaadd: 'dermaplaning' },
+    consentFor: { sv_peel: 'peel', sv_derma: 'dermaplaning', sv_dermaadd: 'dermaplaning', sv_micro: 'microneedling' },
     contra: [
       { flag: 'oncology', services: ['sv_peel', 'sv_micro', 'sv_mdb', 'sv_derma', 'sv_dermaadd', 'sv_hydra', 'sv_acne', 'sv_extract'], cats: ['wax'], level: 'bad', text: 'Oncology client — needs written physician clearance; no peels, needling, microderm, dermaplaning, waxing or heat during treatment.' },
       { flag: 'pregnant', services: ['sv_peel', 'sv_micro', 'sv_led', 'sv_ledadd', 'sv_acne'], cats: [], level: 'bad', text: 'Pregnant or nursing — no peels, microneedling, LED or high-frequency; skip salicylic and retinol products.' },
@@ -1051,7 +1055,7 @@ const TEMPLATES = {
   hair: {
     id: 'hair', label: 'Hair salon', blurb: 'Stylists and colorists: cuts, color, balayage, treatments, styling.', icon: 'spark',
     noun: { pro: 'stylist', pros: 'stylists', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Main Street Hair Co.', phone: '(225) 555-0188', address: '2210 Government St, Baton Rouge, LA 70806', taxRate: 0.0995, exampleName: 'Main Street Hair Co.' },
+    defaults: { name: 'Main Street Hair Co.', phone: '(225) 555-0188', address: '2210 Government St, Baton Rouge, LA 70806', taxRate: 0.105, exampleName: 'Main Street Hair Co.' },
     categories: [{ id: 'cut', label: 'Cuts' }, { id: 'color', label: 'Color' }, { id: 'treat', label: 'Treatments' }, { id: 'style', label: 'Styling' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'h_wcut', name: 'Women\'s Cut & Style', cat: 'cut', dur: 60, price: 65, desc: 'Consultation, shampoo, precision cut, blow-dry.' }, { id: 'h_mcut', name: 'Men\'s Cut', cat: 'cut', dur: 30, price: 35, desc: 'Clipper or scissor cut with hot towel finish.' }, { id: 'h_kids', name: 'Kids Cut (12 & under)', cat: 'cut', dur: 30, price: 25, desc: '' }, { id: 'h_bang', name: 'Bang Trim', cat: 'cut', dur: 15, price: 15, desc: '' },
@@ -1105,7 +1109,7 @@ const TEMPLATES = {
   lash: {
     id: 'lash', label: 'Lash & brow studio', blurb: 'Extensions, fills, lifts, laminations, tints and waxing.', icon: 'spark',
     noun: { pro: 'artist', pros: 'artists', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Lashed & Lifted Studio', phone: '(225) 555-0171', address: '7520 Jefferson Hwy, Baton Rouge, LA 70809', taxRate: 0.0995, exampleName: 'Lashed & Lifted Studio' },
+    defaults: { name: 'Lashed & Lifted Studio', phone: '(225) 555-0171', address: '7520 Jefferson Hwy, Baton Rouge, LA 70809', taxRate: 0.105, exampleName: 'Lashed & Lifted Studio' },
     categories: [{ id: 'ext', label: 'Lash extensions' }, { id: 'lift', label: 'Lifts & laminations' }, { id: 'brow', label: 'Brows' }, { id: 'wax', label: 'Waxing' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'l_classic', name: 'Classic Full Set', cat: 'ext', dur: 120, price: 150, desc: 'One extension per natural lash. Natural mascara look. Consent form required.' }, { id: 'l_hybrid', name: 'Hybrid Full Set', cat: 'ext', dur: 135, price: 180, desc: 'Classic and volume mixed. Consent form required.' }, { id: 'l_volume', name: 'Volume Full Set', cat: 'ext', dur: 150, price: 220, desc: 'Handmade fans, fluffy and full. Consent form required.' }, { id: 'l_cfill', name: 'Classic Fill (2–3 wks)', cat: 'ext', dur: 60, price: 65, desc: 'At least 40% of lashes remaining.' }, { id: 'l_vfill', name: 'Volume Fill (2–3 wks)', cat: 'ext', dur: 75, price: 85, desc: '' }, { id: 'l_removal', name: 'Lash Removal', cat: 'ext', dur: 30, price: 25, desc: 'Gentle cream remover. Free with a new set.' },
@@ -1161,7 +1165,7 @@ const TEMPLATES = {
   nails: {
     id: 'nails', label: 'Nail salon', blurb: 'Manicures, pedicures, gel, acrylic, dip and nail art.', icon: 'spark',
     noun: { pro: 'nail tech', pros: 'nail techs', visit: 'appointment', visits: 'appointments' },
-    defaults: { name: 'Polished Nail Bar', phone: '(225) 555-0160', address: '3535 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.0995, exampleName: 'Polished Nail Bar' },
+    defaults: { name: 'Polished Nail Bar', phone: '(225) 555-0160', address: '3535 Perkins Rd, Baton Rouge, LA 70808', taxRate: 0.105, exampleName: 'Polished Nail Bar' },
     categories: [{ id: 'mani', label: 'Manicures' }, { id: 'pedi', label: 'Pedicures' }, { id: 'enh', label: 'Enhancements' }, { id: 'art', label: 'Nail art' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'n_cmani', name: 'Classic Manicure', cat: 'mani', dur: 30, price: 25, desc: 'Shape, cuticles, massage, regular polish.' }, { id: 'n_gmani', name: 'Gel Manicure', cat: 'mani', dur: 45, price: 40, desc: 'Chip-free for 2–3 weeks.' }, { id: 'n_spamani', name: 'Spa Manicure', cat: 'mani', dur: 45, price: 38, desc: 'Scrub, mask, extended massage, regular polish.' },
@@ -1215,7 +1219,7 @@ const TEMPLATES = {
   massage: {
     id: 'massage', label: 'Massage & wellness', blurb: 'Massage therapists: Swedish, deep tissue, prenatal, hot stone, body treatments.', icon: 'spark',
     noun: { pro: 'therapist', pros: 'therapists', visit: 'session', visits: 'sessions' },
-    defaults: { name: 'Still Water Massage', phone: '(225) 555-0195', address: '8800 Bluebonnet Blvd, Baton Rouge, LA 70810', taxRate: 0.0995, exampleName: 'Still Water Massage' },
+    defaults: { name: 'Still Water Massage', phone: '(225) 555-0195', address: '8800 Bluebonnet Blvd, Baton Rouge, LA 70810', taxRate: 0.105, exampleName: 'Still Water Massage' },
     categories: [{ id: 'massage', label: 'Massage' }, { id: 'spec', label: 'Specialty' }, { id: 'body', label: 'Body treatments' }, { id: 'wellness', label: 'Wellness' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'm_sw60', name: 'Swedish Massage · 60', cat: 'massage', dur: 60, price: 90, desc: 'Relaxation with light to medium pressure.' }, { id: 'm_sw90', name: 'Swedish Massage · 90', cat: 'massage', dur: 90, price: 130, desc: '' }, { id: 'm_dt60', name: 'Deep Tissue · 60', cat: 'massage', dur: 60, price: 105, desc: 'Focused, firm work on chronic tension.' }, { id: 'm_dt90', name: 'Deep Tissue · 90', cat: 'massage', dur: 90, price: 150, desc: '' },
@@ -1272,7 +1276,7 @@ const TEMPLATES = {
   medspa: {
     id: 'medspa', label: 'Med spa', blurb: 'Injectables, laser, medical-grade skin and body contouring under a medical director.', icon: 'spark',
     noun: { pro: 'provider', pros: 'providers', visit: 'treatment', visits: 'treatments' },
-    defaults: { name: 'Meridian Aesthetics', phone: '(225) 555-0130', address: '10000 Perkins Rowe, Baton Rouge, LA 70810', taxRate: 0.0995, exampleName: 'Meridian Aesthetics' },
+    defaults: { name: 'Meridian Aesthetics', phone: '(225) 555-0130', address: '10000 Perkins Rowe, Baton Rouge, LA 70810', taxRate: 0.105, exampleName: 'Meridian Aesthetics' },
     categories: [{ id: 'inject', label: 'Injectables' }, { id: 'laser', label: 'Laser & light' }, { id: 'skin', label: 'Skin' }, { id: 'body', label: 'Body' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'ms_tox20', name: 'Neurotoxin · 20 units', cat: 'inject', dur: 30, price: 260, desc: 'Botox, Dysport or Xeomin. Consent form required.' }, { id: 'ms_tox40', name: 'Neurotoxin · 40 units', cat: 'inject', dur: 30, price: 500, desc: 'Three areas. Consent form required.' }, { id: 'ms_lip', name: 'Lip Filler · 1 syringe', cat: 'inject', dur: 45, price: 650, desc: 'Hyaluronic acid filler. Consent form required.' }, { id: 'ms_cheek', name: 'Cheek or Jaw Filler · 1 syringe', cat: 'inject', dur: 45, price: 750, desc: 'Consent form required.' }, { id: 'ms_consult', name: 'Injectable Consultation', cat: 'inject', dur: 20, price: 0, desc: 'Free. Required before first injectable.' },
@@ -1317,6 +1321,7 @@ const TEMPLATES = {
       { flag: 'autoimmune', services: ['ms_lip', 'ms_cheek', 'ms_rf', 'ms_prp', 'ms_peel'], cats: [], level: 'warn', text: 'Autoimmune condition — higher nodule and reactivity risk; medical director review before filler or needling.' },
       { flag: 'pacemaker', services: ['ms_rf', 'ms_emsculpt', 'ms_cool'], cats: [], level: 'bad', text: 'Pacemaker or implant — no radiofrequency or electromagnetic devices.' },
       { flag: 'diabetes', services: ['ms_rf', 'ms_prp', 'ms_peel', 'ms_cool'], cats: [], level: 'warn', text: 'Diabetes — slower healing; confirm control before needling, peels or contouring.' },
+      { flag: 'cold', services: ['ms_cool'], cats: [], level: 'bad', text: 'Cold sensitivity (Raynaud’s, cold hives, cryoglobulinemia) — no fat freezing.' },
     ],
     intake: { occupationHint: 'Sun exposure matters for laser and pigment treatments', pressureLabel: 'Pressure during facials', routineOptions: ['Cleanser', 'Medical retinol or tretinoin', 'Vitamin C', 'Hydroquinone', 'Acids (AHA / BHA)', 'Growth factors', 'SPF daily', 'Nothing yet'],
       section: { label: 'Your treatments', desc: 'What you have had done and where you want to go.', fields: [
@@ -1336,7 +1341,7 @@ const TEMPLATES = {
   barber: {
     id: 'barber', label: 'Barbershop', blurb: 'Cuts, fades, beards, hot-towel shaves, grey blending.', icon: 'spark',
     noun: { pro: 'barber', pros: 'barbers', visit: 'cut', visits: 'cuts' },
-    defaults: { name: 'Capitol Barber Co.', phone: '(225) 555-0112', address: '450 Laurel St, Baton Rouge, LA 70801', taxRate: 0.0995, exampleName: 'Capitol Barber Co.' },
+    defaults: { name: 'Capitol Barber Co.', phone: '(225) 555-0112', address: '450 Laurel St, Baton Rouge, LA 70801', taxRate: 0.105, exampleName: 'Capitol Barber Co.' },
     categories: [{ id: 'cut', label: 'Cuts' }, { id: 'shave', label: 'Shaves' }, { id: 'beard', label: 'Beard' }, { id: 'color', label: 'Color & treatments' }, { id: 'addon', label: 'Add-ons' }],
     services: [
       { id: 'b_classic', name: 'Classic Cut', cat: 'cut', dur: 30, price: 30, desc: 'Scissor or clipper, hot towel finish.' }, { id: 'b_fade', name: 'Skin Fade', cat: 'cut', dur: 45, price: 40, desc: 'Razor-tight fade, blended to the top.' }, { id: 'b_cutbeard', name: 'Cut + Beard', cat: 'cut', dur: 60, price: 55, desc: 'Our most-booked combo.' }, { id: 'b_kids', name: 'Kids Cut (12 & under)', cat: 'cut', dur: 30, price: 20, desc: '' }, { id: 'b_lineup', name: 'Line-up', cat: 'cut', dur: 15, price: 15, desc: 'Edges and neckline only.' }, { id: 'b_headshave', name: 'Head Shave', cat: 'shave', dur: 30, price: 30, desc: 'Hot towel, straight razor. Consent form required.' },
@@ -1396,26 +1401,40 @@ const TEMPLATES = {
 /* ===== Workspace catalog + generated history, driven by an industry template ===== */
 const FIRST = ['Amelia', 'Brooke', 'Camille', 'Destiny', 'Elise', 'Faith', 'Gabrielle', 'Hannah', 'Isabel', 'Jasmine', 'Kiara', 'Lauren', 'Monique', 'Nia', 'Olivia', 'Paige', 'Renee', 'Simone', 'Tiffany', 'Victoria', 'Whitney', 'Alexis', 'Bianca', 'Celeste', 'Danielle', 'Erin', 'Felicia', 'Giselle', 'Haley', 'Imani', 'Jade', 'Kelsey', 'Lindsey', 'Madison', 'Natalie', 'Octavia', 'Priya', 'Rachel', 'Sierra', 'Taylor', 'Vanessa', 'Yolanda', 'Zoe', 'Angela', 'Brittany', 'Chloe', 'Dominique', 'Emily', 'Francesca', 'Grace', 'Heather', 'Ivy', 'Jordan', 'Kristen', 'Leah', 'Maya', 'Nicole', 'Ophelia', 'Peyton', 'Quinn', 'Rosa', 'Sabrina', 'Tara', 'Uma', 'Valerie', 'Willow', 'Ximena', 'Yasmin', 'Zara', 'Marcus', 'Devin', 'Andre', 'Caleb', 'Tyler', 'Jalen'];
 const LAST = ['Landry', 'Hebert', 'Broussard', 'Guidry', 'Fontenot', 'Richard', 'LeBlanc', 'Robinson', 'Williams', 'Johnson', 'Jackson', 'Thomas', 'Washington', 'Martin', 'Bergeron', 'Trahan', 'Dupre', 'Melancon', 'Babineaux', 'Carter', 'Simmons', 'Harris', 'Lewis', 'Nguyen', 'Tran', 'Patel', 'Garcia', 'Rodriguez', 'Hernandez', 'Morales', 'Scott', 'Green', 'Baker', 'Adams', 'Mitchell', 'Campbell', 'Roberts', 'Phillips', 'Evans', 'Turner', 'Parker', 'Collins', 'Edwards', 'Stewart', 'Morris', 'Reed', 'Cook', 'Bell', 'Murphy', 'Rivera', 'Cooper', 'Ward', 'Peterson', 'Gray', 'James', 'Watson', 'Brooks', 'Kelly', 'Sanders', 'Price', 'Bennett', 'Wood', 'Barnes', 'Ross', 'Henderson', 'Coleman', 'Jenkins', 'Perry', 'Powell', 'Long', 'Patterson', 'Hughes', 'Flores', 'Butler', 'Simms', 'Foster', 'Gonzales', 'Bryant', 'Alexander', 'Russell', 'Griffin', 'Diaz', 'Hayes'];
+const MEN = new Set(['Marcus', 'Devin', 'Andre', 'Caleb', 'Tyler', 'Jalen']);   // first names above that the seed treats as men (no pregnancies; the men's facial)
 const SOURCES = ['Instagram', 'Google', 'Referral', 'Walk-in', 'Website', 'TikTok', 'Referral', 'Instagram'];
 const EVENTS = ['a wedding', 'graduation', 'family photos', 'a gala', 'vacation', 'an anniversary dinner', 'a reunion'];
 const WAITLIST_NOTES = ['Any Saturday morning', 'Flexible on time, prefers the owner', 'Before the 15th (wedding)', 'Evenings after 5 only', 'Wants a cancellation slot this week'];
 const SCHEDULES = [{ 2: [540, 1020], 3: [540, 1020], 4: [540, 1020], 5: [540, 1020], 6: [480, 900] }, { 1: [540, 1080], 2: [540, 1080], 3: [540, 1080], 4: [540, 1080], 5: [540, 1080] }, { 2: [600, 1140], 3: [600, 1140], 4: [600, 1140], 5: [600, 1140], 6: [540, 1020] }, { 1: [480, 960], 2: [480, 960], 4: [480, 960], 5: [480, 960], 6: [480, 900] }, { 1: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [540, 1020] }, { 2: [540, 1080], 3: [540, 1080], 5: [540, 1080], 6: [480, 960] }];
 
-/* Builds the catalog for a workspace: the template's services, categories, products and forms with the business's own name, team and address. */
+/* Builds the catalog for a workspace: the template's services, categories, products and forms with the business's own name, team and address.
+   With opts.studio (a pitch link, 32-studios.js) it's that real studio's menu, prices, hours, memberships and team structure instead. */
+const studioOf = (templateId, id) => (id && STUDIOS[id] && STUDIOS[id].template === templateId ? STUDIOS[id] : null);
 function catalogFor(templateId, opts = {}) {
   const T = TEMPLATES[templateId] || TEMPLATES.facial; const d = T.defaults;
-  const name = (opts.name || '').trim() || d.name; const slug = slugify(name);
+  const P = studioOf(T.id, opts.studio); const src = P || T;
+  const name = (opts.name || '').trim() || (P ? P.name : d.name); const slug = slugify(name);
   const rng = mulberry32(hashHue(name) + 11);
-  const staff = T.staff && !opts.name ? JSON.parse(JSON.stringify(T.staff)) : generateStaff(T, opts, rng);
+  const copy = (x) => JSON.parse(JSON.stringify(x));
+  const staff = P ? copy(P.staff) : T.staff && !opts.name ? copy(T.staff) : generateStaff(T, opts, rng);
   return {
-    templateId, workspace: { name, templateId, opts: { ...opts, name } },
-    business: { name, tagline: T.label, phone: (opts.phone || '').trim() || d.phone, email: `hello@${slug}.example`, address: (opts.address || '').trim() || d.address, slug, taxRate: d.taxRate ?? 0.0995, hours: { 0: null, 1: [540, 1080], 2: [540, 1140], 3: [540, 1140], 4: [540, 1140], 5: [540, 1140], 6: [480, 1020] } },
-    categories: T.categories.map((c) => ({ ...c })), staff,
-    services: T.services.map((s) => ({ ...s })), products: T.products.map((p) => ({ ...p })), plans: T.plans.map((p) => ({ ...p, perks: p.perks.slice(), includes: p.includes.slice() })),
-    formTemplates: [intakeTemplate(T), ...T.consents.map((c) => JSON.parse(JSON.stringify(c))), JSON.parse(JSON.stringify(PHOTO_RELEASE))],
-    consentFor: { ...T.consentFor },
+    templateId, studio: P ? P.id : undefined, workspace: { name, templateId, opts: { ...opts, name } },
+    business: { name, tagline: T.label, phone: (opts.phone || '').trim() || (P ? P.phone : d.phone), email: `hello@${slug}.example`, address: (opts.address || '').trim() || (P ? P.address : d.address), slug, taxRate: d.taxRate ?? 0.105, hours: P ? copy(P.hours) : { 0: null, 1: [540, 1080], 2: [540, 1140], 3: [540, 1140], 4: [540, 1140], 5: [540, 1140], 6: [480, 1020] } },
+    categories: src.categories.map((c) => ({ ...c })), staff,
+    services: src.services.map((s) => copy(s)), products: (P && P.products || T.products).map((p) => ({ ...p })), plans: src.plans.map((p) => ({ ...p, perks: p.perks.slice(), includes: p.includes.slice() })),
+    formTemplates: [intakeTemplate(T), ...T.consents.map(copy), ...(P ? P.consents.map(copy) : []), copy(PHOTO_RELEASE)],
+    consentFor: { ...src.consentFor },
+    copy: P ? { ...T.copy, ...P.copy } : undefined,
     settings: { reminders: { confirmOnBooking: true, sms24h: true, sms2h: true, emailConfirm: true, rebookNudge: true, rebookDays: 28, birthday: true, reviewRequest: false }, booking: { leadMinutes: 60, windowDays: 60, depositRequired: false, cancelHours: 24 } },
   };
+}
+/* The template as the demo generator sees it: a studio profile brings its own add-on habits, rebooking rhythm, mix of
+   caution flags and treatment notes. */
+function seedTpl(cat) {
+  const T = TEMPLATES[cat.templateId] || TEMPLATES.facial; const P = studioOf(T.id, cat.studio);
+  if (!P) return T;
+  const s = P.seed || {};
+  return { ...T, addonWith: s.addonWith || T.addonWith, gaps: { ...T.gaps, ...(s.gaps || {}) }, flagPool: s.flagPool || T.flagPool, notes: { ...T.notes, ...(s.notes || {}) }, copy: { ...T.copy, ...(P.copy || {}) } };
 }
 function generateStaff(T, opts, rng) {
   const n = clamp(parseInt(opts.team, 10) || 4, 2, 6); const used = new Set(); const firsts = T.staffFirst || FIRST; const out = [];
@@ -1428,7 +1447,7 @@ function generateStaff(T, opts, rng) {
 }
 
 function generateClients(rng, cat) {
-  const T = TEMPLATES[cat.templateId]; const clients = []; const used = new Set(); const today = todayStr();
+  const T = seedTpl(cat); const clients = []; const used = new Set(); const today = todayStr();
   const firsts = T.clientFirst || FIRST; const cf = T.clientFields;
   for (let i = 0; i < 420; i++) {
     let first, last, key;
@@ -1442,10 +1461,11 @@ function generateClients(rng, cat) {
     const concerns = uniq([pick(rng, cf.concernOptions), chance(rng, 0.6) ? pick(rng, cf.concernOptions) : null, chance(rng, 0.25) ? pick(rng, cf.concernOptions) : null].filter(Boolean));
     const allergies = chance(rng, 0.14) ? [pick(rng, T.allergyPool)] : [];
     const flags = [];
-    for (const [k, p] of T.flagPool) if (chance(rng, p)) { flags.push(k); if (flags.length >= 2) break; }
+    for (const [k, p] of T.flagPool) if (chance(rng, p) && !(k === 'pregnant' && MEN.has(first))) { flags.push(k); if (flags.length >= 2) break; }
     const medical = seedMedical(rng, flags, allergies, T);
     if (allergies.length) flags.push('allergy');
-    const member = chance(rng, 0.24) ? pick(rng, [cat.plans[0].id, cat.plans[0].id, cat.plans[0].id, (cat.plans[1] || cat.plans[0]).id]) : null;
+    const planMix = cat.plans.length > 2 ? [0, 0, 0, 0, 1, 1, ...cat.plans.slice(2).map((p, i) => i + 2)] : [0, 0, 0, Math.min(1, cat.plans.length - 1)];   // the first plan is the popular one
+    const member = chance(rng, 0.24) ? cat.plans[pick(rng, planMix)].id : null;
     const memberSince = member ? addDays(today, -rint(rng, 20, Math.max(21, createdDaysAgo - 10))) : null;
     const priorVisits = createdDaysAgo > 120 ? Math.round((createdDaysAgo - 90) / 365 * (freq * 4 + 2)) : 0;
     const priorSpend = priorVisits ? priorVisits * (70 + freq * 12) + rint(rng, 0, 120) : 0;
@@ -1464,7 +1484,7 @@ function generateClients(rng, cat) {
 function seedMedical(rng, flags, allergies, T) {
   const has = (k) => flags.includes(k);
   const conditions = [];
-  if (has('oncology')) conditions.push('Cancer (current or past)'); if (has('diabetes')) conditions.push('Diabetes'); if (has('hsv')) conditions.push('Cold sores (herpes simplex)'); if (has('autoimmune')) conditions.push('Autoimmune disorder (lupus, RA, MS…)'); if (has('pacemaker')) conditions.push(pick(rng, ['Pacemaker or metal implants', 'Epilepsy or seizures'])); if (has('thinners')) conditions.push('Bleeding or clotting disorder'); if (has('keloid')) conditions.push('Keloid or raised scarring'); if (has('dvt')) conditions.push('Blood clots or DVT'); if (has('neuro')) conditions.push('Neuromuscular disorder (MG, ALS…)'); if (has('surgery')) conditions.push('Recent surgery (last 6 months)');
+  if (has('oncology')) conditions.push('Cancer (current or past)'); if (has('diabetes')) conditions.push('Diabetes'); if (has('hsv')) conditions.push('Cold sores (herpes simplex)'); if (has('autoimmune')) conditions.push('Autoimmune disorder (lupus, RA, MS…)'); if (has('pacemaker')) conditions.push(pick(rng, ['Pacemaker or metal implants', 'Epilepsy or seizures'])); if (has('thinners')) conditions.push('Bleeding or clotting disorder'); if (has('keloid')) conditions.push('Keloid or raised scarring'); if (has('dvt')) conditions.push('Blood clots or DVT'); if (has('neuro')) conditions.push('Neuromuscular disorder (MG, ALS…)'); if (has('surgery')) conditions.push('Recent surgery (last 6 months)'); if (has('cold')) conditions.push(COLD_CONDITION);
   if (chance(rng, 0.08)) conditions.push(pick(rng, ['Thyroid condition', 'Asthma', 'Rosacea', 'Eczema, psoriasis or dermatitis', 'Heart condition or high blood pressure']));
   if (!conditions.length) conditions.push('None of these');
   const meds = [];
@@ -1500,16 +1520,22 @@ function intakeAnswersFor(c, rng, T) {
   if (m.procedures[0] !== 'None of these') a.procedures_date = addDays(todayStr(), -rint(rng, 3, 20));
   return a;
 }
+// like pick(), but a service can be more popular than its neighbours (seedWeight); unweighted lists pick exactly as pick() does
+function wpick(rng, arr) { const w = (s) => s.seedWeight || 1; let x = rng() * sum(arr, w); for (const s of arr) { x -= w(s); if (x < 0) return s; } return arr[arr.length - 1]; }
 function weightedClientPicker(rng, clients) { const pool = []; clients.forEach((c) => { for (let k = 0; k < c.freq; k++) pool.push(c); }); return () => pick(rng, pool); }
 
 /* Generates appointments, tickets, refunds, notes, photos, forms, messages and a waitlist for the window around `today`. Runs at first load and whenever the calendar day changes. */
 function generateActivity(cat, clients, today, rng, existing = []) {
-  const T = TEMPLATES[cat.templateId];
+  const T = seedTpl(cat);
   const existingBy = {}; for (const e of existing) { if (e.status === 'cancelled') continue; (existingBy[e.date + '|' + e.staffId] ||= []).push(e); }
   const svcById = Object.fromEntries(cat.services.map((s) => [s.id, s]));
-  const mains = cat.services.filter((s) => !s.addon && !s.noAuto && s.price > 0);
+  const mains = cat.services.filter((s) => !s.addon && !s.noAuto && !s.noSeed && s.price > 0);
   const addons = cat.services.filter((s) => s.addon);
   const pickClient = weightedClientPicker(rng, clients);
+  // the demo studio follows its own safety rules: nobody is booked into a service their caution flags rule out, and a
+  // service made for flagged clients (RESTORE) mostly goes to them
+  const unsafe = (c, s) => (T.contra || []).some((r) => r.level === 'bad' && c.flags.includes(r.flag) && (r.services.includes(s.id) || r.cats.includes(s.cat)));
+  const meantFor = {}; const poolFor = (s) => (meantFor[s.id] ||= s.seedFor === 'men' ? clients.filter((c) => MEN.has(c.first)) : clients.filter((c) => c.flags.some((f) => s.forFlags.includes(f))));
   const appts = [], tickets = [], notes = [], photos = [], forms = [], messages = [], waitlist = [], refunds = [];
   let n = 0;
   const byCat = groupBy(mains, (s) => s.cat);
@@ -1526,15 +1552,20 @@ function generateActivity(cat, clients, today, rng, existing = []) {
       let cursor = hrs[0] + pick(rng, [0, 0, 15, 30, 45]); let count = 0;
       while (count < target && cursor < hrs[1] - 30) {
         const bias = st.bias && st.bias.length ? st.bias : CAT_ORDER.slice(0, 2);
-        const c = pick(rng, bias); const pool = byCat[c] || mains; const svc = pick(rng, pool);
+        const can = (s) => !st.skills || st.skills.includes(s.id);
+        const c = pick(rng, bias); const pool = (byCat[c] || mains).filter(can); const svc = wpick(rng, pool.length ? pool : mains.filter(can).length ? mains.filter(can) : mains);
         const items = [{ serviceId: svc.id, price: svc.price, dur: svc.dur }];
-        if ((T.addonWith || []).includes(svc.cat) && addons.length && chance(rng, 0.35)) { const a = pick(rng, addons); items.push({ serviceId: a.id, price: a.price, dur: a.dur }); }
+        const addPool = addons.filter(can);
+        if ((T.addonWith || []).includes(svc.cat) && addPool.length && chance(rng, 0.35)) { const a = pick(rng, addPool); items.push({ serviceId: a.id, price: a.price, dur: a.dur }); }
         const dur = sum(items, (i) => i.dur);
         if (cursor + dur > hrs[1]) break;
         const ex = existingBy[date + '|' + st.id]; if (ex && ex.some((e) => overlaps(cursor, dur, e.start, e.dur))) { cursor += 15; continue; }
         let client = null;
+        const strict = svc.seedFor === 'men'; const meant = svc.forFlags || strict ? poolFor(svc) : null;
         for (let tries = 0; tries < 40; tries++) {
-          const cand = pickClient(); if (takenToday.has(cand.id)) continue;
+          const cand = meant && meant.length && (strict || (tries < 12 && chance(rng, 0.75))) ? pick(rng, meant) : pickClient(); if (takenToday.has(cand.id)) continue;
+          if (strict && !MEN.has(cand.first)) continue;
+          if (unsafe(cand, svc)) continue;
           const last = lastAppt[cand.id];
           if (last && diffDays(last, date) < Math.min(gapFor(svc.cat), 28)) continue;
           if (off > 0 && last && last > today) continue;
@@ -1708,6 +1739,106 @@ function refreshSeededActivity(state) {
   return true;
 }
 
+/* ---- parts/32-studios.js ---- */
+/* ===== Studio profiles: a real studio's own menu, hours and memberships, for pitching that studio =====
+   Opt-in only: a profile opens from its own link (?studio=<id>, or a setup link with the studio's exact name). Everyone
+   else, including the public demo, gets the business type's generic menu, so Luster stays a product for any studio.
+   A profile holds only what the studio publishes itself. Its team is placeholder people in the studio's real roles and
+   skills: the link is public and the demo invents bookings and revenue for every provider, and real people's names don't
+   belong next to made-up numbers. For a private pitch, rename them on that device (Settings → Team); nothing leaves it.
+
+   Simply Facials, Baton Rouge (pilot studio #1): https://www.nwluster.com/?studio=simplyfacials
+   Services, prices, providers and memberships from their Boulevard booking page; durations from their website and
+   membership descriptions; checked October 2026. Durations marked "est" aren't published: confirm with the studio. */
+const STUDIOS = {};
+STUDIOS.simplyfacials = (() => {
+  // what each treatment does to the skin decides who can safely have it
+  const SIG = ['sf_sig', 'sf_sculpt', 'sf_stud', 'sf_buff', 'sf_student'];   // the Signature family: microdermabrasion, dermaplaning, a peel
+  const HYDRA = ['sf_hydra', 'sf_hydradlx', 'sf_hydraplat'];                  // Hydrafacial peel + dermaplaning included
+  const ACNE = ['sf_smooth', 'sf_smoothback'];                                 // Clear Solution acne peel + extractions
+  const NEEDLE = ['sf_procell'], DERMA = ['sf_derma'], CRYO_FACE = ['sf_glacier'], CRYO_BODY = ['sf_cryosculpt', 'sf_cryotone'];
+  const EXFOL = [...SIG, ...HYDRA, ...ACNE, ...NEEDLE, ...DERMA];
+  const services = [
+    { id: 'sf_sig', name: 'The Signature Facial', cat: 'facial', dur: 45, price: 125, seedWeight: 5, desc: 'Our 12-step facial: microdermabrasion, dermaplaning, lymphatic massage, a custom mask and a peel. Evens tone and texture and fades dark spots.' },
+    { id: 'sf_sculpt', name: 'The Sculpt and Glow', cat: 'facial', dur: 60, price: 175, seedWeight: 3, desc: 'The Signature, enhanced: up to 15 steps with LED, microcurrent and sculpting massage to lift, tone and smooth fine lines. Neck, shoulder, hand and arm massage included.' },
+    { id: 'sf_stud', name: 'The Stud (Gentlemen\'s Facial)', cat: 'facial', dur: 60, price: 150, seedFor: 'men', desc: 'A 12-step facial built for men\'s skin and the signs of aging it fights every day.' },
+    { id: 'sf_buff', name: 'The Buff & Polish', cat: 'facial', dur: 40, price: 100, seedWeight: 2, desc: 'The in-between facial: a mid-month glow-up that keeps skin hydrated and radiant between monthly facials.' },
+    { id: 'sf_sweet', name: 'The Simply Sweet (12 and under)', cat: 'facial', dur: 30, price: 35, desc: 'A gentle facial for young skin, with mild ingredients made for little faces. A parent or guardian signs the intake.', noSeed: true },   // dur est
+    { id: 'sf_student', name: 'Student Special (Wednesdays only)', cat: 'facial', dur: 45, price: 99, desc: 'Student pricing on Wednesdays.', noSeed: true },   // dur est
+    { id: 'sf_restore', name: 'RESTORE Facial Treatment', cat: 'restore', dur: 60, price: 100, forFlags: ['oncology', 'autoimmune'], desc: 'For medically reactive skin: chemotherapy, radiation, autoimmune conditions or hypersensitivity. Physician-approved, fragrance-free products and oncology-certified estheticians.' },
+    { id: 'sf_smooth', name: 'The Smooth Face (acne)', cat: 'acne', dur: 45, price: 125, seedWeight: 2, desc: 'Acne facial with the Clear Solution peel, extractions and targeted spot treatment to clear breakouts and prevent new ones.' },
+    { id: 'sf_smoothback', name: 'The Smooth Back (acne)', cat: 'acne', dur: 45, price: 150, desc: 'The Smooth acne treatment for the shoulders and back.' },   // dur est
+    { id: 'sf_spot', name: 'Blemish Spot Treatment', cat: 'acne', dur: 15, price: 25, addon: true, desc: 'Targeted treatment for an active breakout.' },
+    { id: 'sf_hydra', name: 'Basic Hydrafacial', cat: 'hydra', dur: 45, price: 250, seedWeight: 2, desc: 'Cleanse, exfoliate, extract and hydrate. Dermaplaning included.' },   // dur est
+    { id: 'sf_hydradlx', name: 'Deluxe Hydrafacial', cat: 'hydra', dur: 60, price: 275, desc: 'The Basic plus a targeted booster serum and LED light therapy. Dermaplaning included.' },   // dur est
+    { id: 'sf_hydraplat', name: 'Platinum Hydrafacial', cat: 'hydra', dur: 75, price: 335, desc: 'The Deluxe plus lymphatic drainage. Dermaplaning included.' },   // dur est
+    { id: 'sf_procell', name: 'Procell Microchanneling', cat: 'advanced', dur: 60, price: 350, desc: 'Next-generation microneedling: micro-channels plus stem-cell growth-factor serum for collagen, texture, scars and sun damage, with little downtime. Face, neck and aftercare included.' },
+    { id: 'sf_derma', name: 'Dermaplane', cat: 'advanced', dur: 30, price: 60, desc: 'Removes dead skin and peach fuzz for a smooth, makeup-ready finish.' },   // dur est
+    { id: 'sf_glacier', name: 'Glacier Facial (cryotherapy)', cat: 'cryo', dur: 45, price: 175, seedWeight: 2, desc: 'ExoSkin cryo facial: sub-zero cooling firms, tightens and calms, with no downtime.' },   // dur est
+    { id: 'sf_cryosculpt', name: 'CryoSculpt (body slimming)', cat: 'cryo', dur: 60, price: 250, desc: 'ExoFreeze fat reduction for stubborn areas: abdomen, love handles, thighs and arms.' },   // dur est
+    { id: 'sf_cryotone', name: 'CryoTone (toning & cellulite)', cat: 'cryo', dur: 45, price: 235, desc: 'Cryotherapy plus muscle stimulation to firm skin and smooth the look of cellulite.' },   // dur est
+  ];
+  const except = (...ids) => services.map((s) => s.id).filter((id) => !ids.includes(id));
+  return {
+    id: 'simplyfacials', template: 'facial', name: 'Simply Facials', phone: '(225) 955-3695', address: '4353 Perkins Rd, Ste 12-D, Baton Rouge, LA 70808',
+    hours: { 0: null, 1: [480, 1080], 2: [480, 1080], 3: [480, 1080], 4: [480, 1080], 5: [480, 1080], 6: [540, 840] },   // Mon–Fri 8–6, Sat 9–2
+    categories: [{ id: 'facial', label: 'Facials' }, { id: 'restore', label: 'RESTORE · oncology & sensitive skin' }, { id: 'acne', label: 'The Smooth · acne' }, { id: 'hydra', label: 'Hydrafacial' }, { id: 'advanced', label: 'Microchanneling & dermaplaning' }, { id: 'cryo', label: 'Cryotherapy' }],
+    services,
+    // three bookable estheticians, as on their booking page: one does everything, one skips dermaplaning and body cryo, one skips dermaplaning
+    staff: [
+      { id: 's1', name: 'Danielle Boudreaux', role: 'Licensed Esthetician', color: '#1E5C68', bookable: true, days: { 2: [480, 960], 3: [480, 960], 4: [480, 960], 5: [480, 960], 6: [540, 840] }, bio: 'Oncology-certified. Procell, Hydrafacial, cryotherapy and dermaplaning.', bias: ['facial', 'facial', 'facial', 'advanced', 'hydra', 'cryo', 'facial', 'facial'] },
+      { id: 's2', name: 'Brianna Thibodeaux', role: 'Licensed Esthetician', color: '#6250d6', bookable: true, days: { 1: [480, 1020], 2: [480, 1020], 3: [480, 1020], 4: [480, 1020], 5: [480, 1020] }, bio: 'Oncology-certified. Signature, Sculpt and Glow and RESTORE.', skills: except('sf_derma', 'sf_cryosculpt', 'sf_cryotone'), bias: ['facial', 'facial', 'facial', 'restore', 'acne', 'hydra', 'facial', 'facial'] },
+      { id: 's3', name: 'Kayla Nguyen', role: 'Licensed Esthetician', color: '#B23A30', bookable: true, days: { 1: [600, 1080], 2: [600, 1080], 4: [600, 1080], 5: [600, 1080], 6: [540, 840] }, bio: 'Oncology-certified. Acne, cryotherapy and Hydrafacial.', skills: except('sf_derma'), bias: ['facial', 'facial', 'restore', 'acne', 'facial', 'cryo', 'hydra', 'facial'] },
+      { id: 's4', name: 'Jordan Pierce', role: 'Studio Manager', color: '#566068', bookable: false, days: {}, bio: '' },
+    ],
+    plans: [
+      { id: 'pl_essential', name: 'Essential Treatment Membership', price: 99, perks: ['One Signature Facial every month'], includes: ['sf_sig'], retailDiscount: 0 },
+      { id: 'pl_enhanced', name: 'Enhanced Treatment Membership', price: 250, perks: ['One Sculpt and Glow every month', 'One Buff & Polish every month', '10% off products'], includes: ['sf_sculpt', 'sf_buff'], retailDiscount: 0.10 },
+      { id: 'pl_sculpt', name: 'The Sculpt and Glow Membership', price: 159, perks: ['One Sculpt and Glow every month'], includes: ['sf_sculpt'], retailDiscount: 0 },
+      { id: 'pl_clear', name: 'The Clear Solution Acne Membership', price: 150, perks: ['One Smooth acne treatment every month', 'Two Blemish Spot Treatments every month', '10% off products'], includes: ['sf_smooth', 'sf_spot'], retailDiscount: 0.10 },
+    ],
+    consents: [
+      consent('cryo', 'Cryotherapy Consent', 'Cryotherapy warms the treatment area briefly, then cools it to sub-zero temperatures. On the face it tightens and calms the skin; on the body it breaks down fat cells, which your body clears over the following weeks. CryoTone also uses gentle electrical muscle stimulation. Expect redness, tingling, numbness or tenderness in the area for a few hours to a few days. Rare effects include bruising, temporary skin discoloration, cold injury to the skin and, very rarely after fat freezing, a firm enlargement of the treated fat. It isn\'t done during pregnancy, on numb or broken skin, or for anyone with cold hives, Raynaud\'s, cryoglobulinemia or another cold-related blood disorder; a pacemaker or other implanted device rules out the muscle stimulation.', ['I understand the area may be red, numb, tingly or tender for a few hours to days, and that body results build over several weeks.', 'I am not pregnant, and I don\'t have cold hives, Raynaud\'s, cryoglobulinemia or another cold-related condition, numbness in the area, or a pacemaker or other implanted device.', 'I will tell my provider right away if anything feels painfully cold or burning during the treatment.']),
+    ],
+    consentFor: { sf_derma: 'dermaplaning', sf_procell: 'microneedling', sf_glacier: 'cryo', sf_cryosculpt: 'cryo', sf_cryotone: 'cryo' },
+    // their protocol: RESTORE is the oncology and autoimmune path; prep rule from their FAQ (retinol off 3–5 days before)
+    contra: [
+      { flag: 'oncology', services: [...SIG, ...HYDRA, ...ACNE, ...DERMA], cats: [], level: 'bad', text: 'Oncology client — this facial exfoliates (dermaplaning, microdermabrasion or a peel). During treatment and recovery book the RESTORE Facial instead; anything else needs the oncologist\'s written clearance.' },
+      { flag: 'oncology', services: NEEDLE, cats: [], level: 'bad', text: 'Oncology client — no microchanneling during treatment or recovery: open skin and infection risk. Book RESTORE; anything else needs the oncologist\'s written clearance.' },
+      { flag: 'oncology', services: [...CRYO_FACE, ...CRYO_BODY], cats: [], level: 'bad', text: 'Oncology client — no cryotherapy during treatment or recovery (sensitivity, numbness, circulation). Book RESTORE; anything else needs the oncologist\'s written clearance.' },
+      { flag: 'autoimmune', services: EXFOL, cats: [], level: 'warn', text: 'Autoimmune condition — reactive, slow-healing skin. RESTORE is the safe default; otherwise patch test and skip the peel.' },
+      { flag: 'pregnant', services: [...NEEDLE, ...CRYO_BODY, 'sf_sculpt'], cats: [], level: 'bad', text: 'Pregnant or nursing — no microchanneling, body cryotherapy, microcurrent or LED. Offer the Signature or Buff & Polish, adapted for pregnancy.' },
+      { flag: 'pregnant', services: [...SIG.filter((id) => id !== 'sf_sculpt'), ...HYDRA, ...ACNE, ...CRYO_FACE], cats: [], level: 'warn', text: 'Pregnant or nursing — adapt it: no salicylic, retinol or strong peel; positioning for comfort.' },
+      { flag: 'accutane', services: EXFOL, cats: [], level: 'bad', text: 'Accutane within 6 months — skin lifts and scars. No dermaplaning, microdermabrasion, peels or needling (the Signature family, Hydrafacials, the Smooth and Procell all include them).' },
+      { flag: 'retinoid', services: EXFOL, cats: [], level: 'warn', text: 'Retinoid user — studio prep rule: retinol off 3–5 days before. Confirm, or skip the dermaplaning and peel steps.' },
+      { flag: 'hsv', services: [...SIG, ...HYDRA, 'sf_smooth', ...NEEDLE, ...DERMA], cats: [], level: 'warn', text: 'Cold-sore history — peels, dermaplaning and needling can trigger an outbreak. Antiviral 2 days before, or avoid the lip area.' },
+      { flag: 'botox', services: ['sf_sig', 'sf_sculpt', 'sf_stud', 'sf_hydraplat', 'sf_glacier'], cats: [], level: 'warn', text: 'Botox or filler within 14 days — no facial massage, microcurrent, lymphatic work or cryo over the treated areas.' },
+      { flag: 'pacemaker', services: ['sf_sculpt', 'sf_cryotone', 'sf_hydradlx', 'sf_hydraplat'], cats: [], level: 'bad', text: 'Pacemaker or seizure history — no microcurrent, muscle stimulation or LED in this treatment.' },
+      { flag: 'keloid', services: NEEDLE, cats: [], level: 'bad', text: 'Keloid-prone — no microchanneling.' },
+      { flag: 'thinners', services: [...NEEDLE, ...DERMA, ...ACNE], cats: [], level: 'warn', text: 'Blood thinners — bruising and bleeding risk. Light extractions only; check before needling or dermaplaning.' },
+      { flag: 'diabetes', services: [...NEEDLE, ...ACNE, ...CRYO_BODY], cats: [], level: 'warn', text: 'Diabetes — slow healing and reduced sensation. Gentle extractions; check sensation before cryotherapy (cold-injury risk).' },
+      { flag: 'cold', services: [...CRYO_FACE, ...CRYO_BODY], cats: [], level: 'bad', text: 'Cold sensitivity (Raynaud’s, cold hives, cryoglobulinemia) — no cryotherapy.' },
+      { flag: 'dvt', services: CRYO_BODY, cats: [], level: 'warn', text: 'Blood clot history — physician clearance before body cryotherapy, especially on the legs.' },
+      { flag: 'surgery', services: [...NEEDLE, ...CRYO_BODY], cats: [], level: 'warn', text: 'Recent surgery — stay off the surgical area; physician clearance before body treatments.' },
+    ],
+    copy: { bookingIntro: 'Pick what your skin needs. New here? Start with The Signature Facial.', rebook: 'it\'s been about a month since your last facial — your skin is due.', birthdayPerk: 'a little extra glow', oncologyProtocol: 'Book RESTORE. Light pressure, no heat or steam, avoid the lymph-node side, nothing exfoliating during treatment, fragrance-free products, shorter sessions if fatigued.' },
+    // how the demo history is generated for this studio
+    seed: {
+      addonWith: ['acne'],
+      gaps: { facial: 28, restore: 28, acne: 28, hydra: 28, advanced: 35, cryo: 14 },
+      flagPool: [['oncology', 0.06], ['autoimmune', 0.03], ['retinoid', 0.035], ['diabetes', 0.03], ['pregnant', 0.02], ['botox', 0.02], ['hsv', 0.02], ['accutane', 0.012], ['thinners', 0.008], ['keloid', 0.008], ['cold', 0.008], ['pacemaker', 0.004]],
+      notes: {
+        restore: ['RESTORE. Three weeks post-chemo, skin very dry and tight. Fragrance-free cleanse, no steam, no exfoliation. Barrier mask, light massage, avoided the port side. Client dozed off. Recheck clearance letter before next visit.', 'Radiation site (chest) avoided entirely; face and scalp massage only. Skin calmer than last month. Sent home with a Restore line sample.', 'Autoimmune flare this week. Kept it gentle: cool compresses, oat mask, no actives. Redness down by the end of the session.', 'Finished treatment two months ago and tolerance is improving. Still no exfoliation per her oncologist. Hydration focus; next RESTORE in 4 weeks.'],
+        acne: ['Smooth Face: Clear Solution peel, extractions on chin and nose, spot treatment on 3 active lesions. Home care: gentle cleanser AM/PM, spot gel at night.', 'Breakouts down about half since the first Smooth visit. Peel on 4 min. Teen client; mom in the room, went over the home routine together.', 'Smooth Back: Clear Solution peel across shoulders and upper back, extractions x9. Loose cotton tops after workouts.', 'Hormonal flare along the jaw. Light extractions today, spot treatment x4. Rebook in 4 weeks; talked through the Clear Solution membership.'],
+        hydra: ['Basic Hydrafacial with dermaplaning. Good extraction on the nose. Skin plump and even afterward.', 'Deluxe Hydrafacial: brightening booster, LED finish. Client has an event Saturday — glowing.', 'Platinum Hydrafacial: lymphatic drainage first, puffiness noticeably down. Dermaplaning tolerated well, no nicks.'],
+        cryo: ['Glacier Facial. Redness calmed, pores visibly tighter. Client loved the cold finish.', 'CryoSculpt, abdomen, 2 zones. Sensation checked first: normal. Mild redness, gone in 20 min. Next session in 2 weeks; results build over 6–8 weeks.', 'CryoTone, thighs. Muscle stimulation at level 4, comfortable. Reminded her to drink lots of water for 48 hours.'],
+        plan: ['Plan: Sculpt and Glow monthly plus a Buff & Polish mid-month (Enhanced membership) for 3 months, then reassess fine lines.', 'Plan: Procell series of 3, 4–6 weeks apart, then quarterly maintenance. Photos at each visit.', 'Goal before {event}: Signature monthly, Hydrafacial the week before. Daily SPF non-negotiable.', 'Acne plan: Smooth Face monthly plus 2 spot treatments (Clear Solution membership). Home care reviewed; recheck in 8 weeks.', 'Oncology plan: RESTORE every 4 weeks during treatment. Nothing exfoliating until the oncologist clears it.'],
+      },
+    },
+  };
+})();
+TEMPLATES.facial.contra.push(...STUDIOS.simplyfacials.contra);   // safety rules follow the services into a live business; inert for other menus (their service ids differ)
+
 /* ---- parts/33-store.js ---- */
 /* ===== Store: workspaces, persistence, derived data, mutations ===== */
 const WS_INDEX_KEY = 'luster.ws.index', WS_CUR_KEY = 'luster.ws.current';
@@ -1715,11 +1846,21 @@ let LS_KEY = '';
 const S = { state: null, ui: null, photoUrls: new Map(), wsId: null };
 // Demo workspaces reseed when SEED_VERSION changes. Live workspaces hold real data, so their key never changes.
 const wsKey = (id) => { const w = (S.wsIndex || []).find((x) => x.id === id); return w && w.live ? `luster.live.${id}` : `luster.ws.${id}.v${SEED_VERSION}`; };
-function loadIndex() { try { const i = JSON.parse(localStorage.getItem(WS_INDEX_KEY) || '[]'); return Array.isArray(i) && i.length ? i : null; } catch (e) { return null; } }
+function loadIndex() {
+  try {
+    const i = JSON.parse(localStorage.getItem(WS_INDEX_KEY) || '[]'); if (!Array.isArray(i) || !i.length) return null;
+    // devices from before studio profiles had Simply Facials as their example business: it stays theirs, now as that studio's pitch
+    for (const w of i) if (w.id === 'simply' && w.templateId === 'facial' && w.name === 'Simply Facials' && !w.live && !(w.opts && (w.opts.name || w.opts.studio))) w.opts = { ...(w.opts || {}), studio: 'simplyfacials' };
+    return i;
+  } catch (e) { return null; }
+}
 function saveIndex(idx) { try { localStorage.setItem(WS_INDEX_KEY, JSON.stringify(idx)); } catch (e) {} }
-function workspaces() { return S.wsIndex || (S.wsIndex = loadIndex() || [{ id: 'simply', name: TEMPLATES.facial.defaults.name, templateId: 'facial', opts: {}, createdAt: todayStr() }]); }
+// the example business every new device starts with: the business type's generic menu, never a real studio's
+const isExampleWs = (w) => w.templateId === 'facial' && !w.live && !(w.opts && (w.opts.name || w.opts.studio));
+function workspaces() { return S.wsIndex || (S.wsIndex = loadIndex() || [{ id: 'demo', name: TEMPLATES.facial.defaults.name, templateId: 'facial', opts: {}, createdAt: todayStr() }]); }
 function currentWs() { return workspaces().find((w) => w.id === S.wsId) || workspaces()[0]; }
 const tpl = () => TEMPLATES[(S.state && S.state.templateId) || 'facial'];
+const wording = (k) => (S.state && S.state.copy && S.state.copy[k]) || tpl().copy[k];   // a studio profile can word things its own way
 const bizUrl = (path = '') => `${(S.state && S.state.business.slug) || 'studio'}.example${path}`;
 
 /* Workspace state lives in IndexedDB (localStorage caps out around 5 MB; one busy workspace is 2–3 MB). */
@@ -1757,10 +1898,11 @@ const saveNow = () => KV.set(LS_KEY, S.state);
 function resetDemo() { const ws = currentWs(); if (ws.live) return; S.state = buildInitialState(ws.templateId, ws.opts || {}); S.state.refunds ||= []; invalidateIndex(); refreshTodayStatuses(); saveState(); }
 function createWorkspace(templateId, opts) {
   Cloud.stop(); APP_TZ = null;
-  const idx = workspaces(); const id = uid('ws_'); const name = (opts.name || '').trim() || TEMPLATES[templateId].defaults.name;
+  const P = studioOf(templateId, opts.studio);
+  const idx = workspaces(); const id = uid('ws_'); const name = (opts.name || '').trim() || (P ? P.name : TEMPLATES[templateId].defaults.name);
   idx.push({ id, name, templateId, opts: { ...opts, name }, createdAt: todayStr() }); saveIndex(idx);
   try { localStorage.setItem(WS_CUR_KEY, id); } catch (e) {}
-  S.wsId = id; LS_KEY = wsKey(id); S.state = buildInitialState(templateId, opts); invalidateIndex(); refreshTodayStatuses(); saveState();
+  S.wsId = id; LS_KEY = wsKey(id); S.state = buildInitialState(templateId, { ...opts, name }); invalidateIndex(); refreshTodayStatuses(); saveState();   // same opts as every later reseed
   return idx[idx.length - 1];
 }
 async function switchWorkspace(id) {
@@ -2154,10 +2296,29 @@ const Cloud = {
   },
   // the studio's forms as the client's phone renders them; the business type's own intake questions are marked so the
   // phone can work out the same caution flags the iPad would (book/intake.js)
+  // each template also carries the services that need it signed first, so every device asks for the same consents
   formTemplatesPayload() {
     const vertical = new Set(((tpl().intake || {}).section || { fields: [] }).fields.map((f) => f.id));
+    const needs = st().consentFor || {};
     return (st().formTemplates || []).map((t) => ({ business_id: this.L().businessId, template_id: t.id, kind: t.kind || 'consent', name: t.name,
-      definition: { ...t, fields: t.fields.map((f) => (t.id === 'intake' && vertical.has(f.id) ? { ...f, vertical: true } : f)) } }));
+      definition: { ...t, fields: t.fields.map((f) => (t.id === 'intake' && vertical.has(f.id) ? { ...f, vertical: true } : f)), services: Object.keys(needs).filter((k) => needs[k] === t.id).sort() } }));
+  },
+  // a device opening the business from the cloud (or after another device changed them) gets the studio's own forms and
+  // which services need which consent, instead of the business type's defaults
+  async pullForms() {
+    const sb = this.sb(); const L = this.L();
+    if (L.formsHash && hashOf(this.formTemplatesPayload()) !== L.formsHash) return;   // this device's form changes aren't sent yet: they win
+    const rows = await this.fetchAll(() => sb.from('form_templates').select('template_id, kind, name, definition').eq('business_id', L.businessId).order('template_id'));
+    if (!rows.length) return;
+    const byId = new Map((st().formTemplates || []).map((t) => [t.id, t])); const needs = {}; let mapped = false;
+    for (const r of rows) {
+      const { services, ...def } = r.definition || {}; if (!Array.isArray(def.fields)) continue;
+      byId.set(r.template_id, { ...def, id: r.template_id, kind: r.kind || def.kind, name: r.name || def.name, fields: def.fields.map(({ vertical, ...f }) => f) });
+      if (Array.isArray(services)) { mapped = true; for (const k of services) needs[k] = r.template_id; }
+    }
+    st().formTemplates = Array.from(byId.values());
+    if (mapped) st().consentFor = needs;   // sent by a device that knows the mapping (older versions didn't send one)
+    L.formsHash = hashOf(this.formTemplatesPayload());
   },
   catalogPayload(state = S.state, ids = this.L().ids) {
     return {
@@ -2241,7 +2402,7 @@ const Cloud = {
   async pull(full) {
     const sb = this.sb(); const L = this.L(); const biz = L.businessId;
     for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
-    if (full) await this.pullCatalog();
+    if (full) { await this.pullCatalog(); await this.pullForms(); }
     const since = full ? null : L.lastPull;
     const overlap = (t) => new Date(Date.parse(t) - 120000).toISOString();   // rows can commit slightly out of timestamp order; re-reading two minutes is cheap and merges are idempotent
     const tz = this.tz(); const from = zonedToUtc(addDays(todayStr(), -180), 0, tz).toISOString();
@@ -2292,7 +2453,12 @@ const Cloud = {
     ]);
     const st0 = S.state;
     if (L.catalogHash && hashOf([this.catalogPayload(), this.bizRow()]) !== L.catalogHash) return;   // local menu/team edits not sent yet: push wins
-    if (bizRows[0]) { const b = bizRows[0]; Object.assign(st0.business, { name: b.name, phone: b.phone || '', address: b.address || '' }); L.slug = b.slug; L.timezone = b.timezone; APP_TZ = b.timezone; }
+    if (bizRows[0]) {
+      const b = bizRows[0]; Object.assign(st0.business, { name: b.name, phone: b.phone || '', address: b.address || '' }); L.slug = b.slug; L.timezone = b.timezone; APP_TZ = b.timezone;
+      // the menu's sections travel with the booking settings; another device (or a menu set up for the studio) may have changed them
+      const cats = b.booking && Array.isArray(b.booking.categories) ? b.booking.categories.filter((c) => c && c.key) : [];
+      if (cats.length) { st0.categories = cats.map((c) => ({ id: c.key, label: c.label || c.key })); syncCategories(st0.categories); }
+    }
     for (const v of services) {
       const key = v.key || v.id; L.ids.services[key] = v.id;
       let loc = svcById(key);
@@ -2462,7 +2628,7 @@ function createLiveWorkspace({ businessId, slug, timezone, ids, from }) {
 function emptyLiveState(entry, from, ids) {
   const base = from || catalogFor(entry.templateId, { name: entry.name });
   const copy = (x) => JSON.parse(JSON.stringify(x));
-  const keep = ['templateId', 'business', 'categories', 'staff', 'services', 'products', 'plans', 'formTemplates', 'consentFor', 'settings'];
+  const keep = ['templateId', 'studio', 'copy', 'business', 'categories', 'staff', 'services', 'products', 'plans', 'formTemplates', 'consentFor', 'settings'];
   const st0 = { version: SEED_VERSION, seedDay: todayStr() };
   for (const k of keep) if (base[k] !== undefined) st0[k] = copy(base[k]);
   if (!from) { st0.staff = []; st0.services = []; }
@@ -3068,7 +3234,7 @@ function clientHealth(c) {
   const cancer = m.cancer;
   return `<div class="col" style="gap:14px">
     ${risks.length ? `<div class="col">${risks.map((r) => `<div class="alert ${r.level}">${I.warn}<div><b>${r.services.length ? esc(r.services.join(', ')) + ' on ' + fmtDate(r.a.date, 'dow') : 'Before any treatment'}:</b> ${esc(r.text)}</div></div>`).join('')}</div>` : clientFlags(c).length ? '' : `<div class="alert good">${I.check}<div>No contraindications on file.</div></div>`}
-    ${cancer ? `<div class="card pad" style="border-color:var(--bad);"><div class="row between"><div class="row"><span class="badge bad">${I.warn}Oncology client</span><b>${esc(cancer.type || 'Cancer')}</b><span class="muted">· ${esc(cancer.status || '')}</span></div><span class="badge ${cancer.clearance === 'Yes, letter on file' ? 'good' : 'bad'}">${cancer.clearance === 'Yes, letter on file' ? 'Clearance on file' : 'No clearance letter'}</span></div><dl class="kv" style="margin-top:10px">${row('Treatments', list(cancer.tx))}${cancer.radiationArea ? row('Radiation area', esc(cancer.radiationArea)) : ''}${row('Lymph nodes', esc(cancer.lymph))}${row('Port / PICC', esc(cancer.port))}${row('Side effects', list(cancer.effects))}${row('Physician', esc(cancer.physician))}</dl><div class="small muted" style="margin-top:8px">Protocol: ${esc(tpl().copy.oncologyProtocol)}</div></div>` : ''}
+    ${cancer ? `<div class="card pad" style="border-color:var(--bad);"><div class="row between"><div class="row"><span class="badge bad">${I.warn}Oncology client</span><b>${esc(cancer.type || 'Cancer')}</b><span class="muted">· ${esc(cancer.status || '')}</span></div><span class="badge ${cancer.clearance === 'Yes, letter on file' ? 'good' : 'bad'}">${cancer.clearance === 'Yes, letter on file' ? 'Clearance on file' : 'No clearance letter'}</span></div><dl class="kv" style="margin-top:10px">${row('Treatments', list(cancer.tx))}${cancer.radiationArea ? row('Radiation area', esc(cancer.radiationArea)) : ''}${row('Lymph nodes', esc(cancer.lymph))}${row('Port / PICC', esc(cancer.port))}${row('Side effects', list(cancer.effects))}${row('Physician', esc(cancer.physician))}</dl><div class="small muted" style="margin-top:8px">Protocol: ${esc(wording('oncologyProtocol'))}</div></div>` : ''}
     <div class="grid-2">
       <div class="card pad"><div class="eyebrow" style="margin-bottom:8px">Medical</div><dl class="kv">${row('Conditions', list(m.conditions, ['Cancer', 'Pacemaker', 'Epilepsy', 'Bleeding']))}${m.conditionsDetail ? row('Notes', esc(m.conditionsDetail)) : ''}${row('Medications', list(m.meds, ['Accutane', 'Blood thinners', 'Immunosuppressants']))}${row('List', esc(m.medsList))}${row('Allergies', list(c.allergies.length ? c.allergies : ['None known'], ['Latex', 'Lidocaine', 'Nuts']) + (m.allergiesOther ? ` <span class="small">${esc(m.allergiesOther)}</span>` : ''))}${row('Pregnancy', esc(m.pregnancy))}${row('Recent procedures', list(m.procedures, ['Botox', 'Laser', 'Chemical', 'Microneedling']) + (m.proceduresDate ? ` <span class="small muted">${fmtDate(m.proceduresDate)}</span>` : ''))}</dl></div>
       <div class="card pad"><div class="eyebrow" style="margin-bottom:8px">${esc(tpl().intake.section.label.replace(/^Your /, ''))}</div><dl class="kv">${row(tpl().clientFields.typeLabel, esc(c.skin))}${row(tpl().clientFields.concernsLabel, list(c.concerns))}${tpl().intake.section.fields.filter((f) => f.id !== 'skin' && f.id !== 'concerns').map((f) => { const v = (m.vertical || {})[f.id] ?? m[f.id]; return row(esc(f.short || f.label.replace(/\?$/, '')), Array.isArray(v) ? list(v) : esc(v || '')); }).join('')}${row('Sunscreen', esc(m.sun))}${row('Smokes', esc(m.smoke))}${row('Home care', list(m.routine))}${m.products ? row('Products', esc(m.products)) : ''}</dl></div>
@@ -3103,7 +3269,7 @@ function clientMembership(c) {
   const usedThisMonth = plan ? st().tickets.filter((t) => t.clientId === c.id && t.date.slice(0, 7) === today.slice(0, 7) && t.lines.some((l) => l.note && l.note.includes('visit'))).length : 0;
   const renew = plan && c.memberSince ? (() => { const d = fromDateStr(c.memberSince); const n = new Date(); n.setDate(d.getDate()); if (n < new Date()) n.setMonth(n.getMonth() + 1); return toDateStr(n); })() : null;
   return `<div class="grid-2">
-    <div class="card pad">${plan ? `<div class="row between"><div><div class="eyebrow">Membership</div><div class="strong" style="font-size:18px">${esc(plan.name)}</div></div><span class="badge ${c.memberStatus === 'active' ? 'good' : 'bad'}">${c.memberStatus === 'active' ? 'Active' : 'Past due'}</span></div><dl class="kv" style="margin-top:12px"><dt>Since</dt><dd>${fmtDate(c.memberSince)}</dd><dt>Renews</dt><dd>${renew ? fmtDate(renew) : '—'} · ${money(plan.price, { whole: true })}/mo</dd><dt>This month</dt><dd>${usedThisMonth ? `${usedThisMonth} included visit used` : 'Included visit available'}</dd><dt>Retail</dt><dd>${Math.round(plan.retailDiscount * 100)}% off</dd></dl><div class="row" style="margin-top:12px">${c.memberStatus === 'past_due' ? (isLive() ? `<button class="btn primary sm" data-act="member-paid" data-id="${c.id}">Mark paid</button>` : `<button class="btn primary sm" data-act="member-retry" data-id="${c.id}">Retry card</button>`) : ''}<button class="btn sm" data-act="member-change" data-id="${c.id}">Change plan</button><button class="btn sm danger" data-act="member-cancel" data-id="${c.id}">Cancel</button></div>` : `<div class="eyebrow">Membership</div><div class="strong" style="font-size:18px">Not a member</div><p class="small muted" style="margin:6px 0 12px">Members visit 2.3× more often. ${esc(c.first)} has ${clientStats(c.id).visits} visits — a good candidate for ${esc(st().plans[0].name)}.</p>${isLive() ? '<div class="tiny faint" style="margin:-6px 0 10px">Billing isn\'t connected yet: charge the membership on your own terminal each month. Memberships are kept on this iPad for now.</div>' : ''}<div class="row wrap">${st().plans.map((p) => `<button class="btn sm primary" data-act="member-enroll" data-id="${c.id}" data-plan="${p.id}">Enroll · ${esc(p.name)} ${money(p.price, { whole: true })}/mo</button>`).join('')}</div>`}</div>
+    <div class="card pad">${plan ? `<div class="row between"><div><div class="eyebrow">Membership</div><div class="strong" style="font-size:18px">${esc(plan.name)}</div></div><span class="badge ${c.memberStatus === 'active' ? 'good' : 'bad'}">${c.memberStatus === 'active' ? 'Active' : 'Past due'}</span></div><dl class="kv" style="margin-top:12px"><dt>Since</dt><dd>${fmtDate(c.memberSince)}</dd><dt>Renews</dt><dd>${renew ? fmtDate(renew) : '—'} · ${money(plan.price, { whole: true })}/mo</dd><dt>This month</dt><dd>${usedThisMonth ? `${usedThisMonth} included visit used` : 'Included visit available'}</dd><dt>Retail</dt><dd>${Math.round(plan.retailDiscount * 100)}% off</dd></dl><div class="row" style="margin-top:12px">${c.memberStatus === 'past_due' ? (isLive() ? `<button class="btn primary sm" data-act="member-paid" data-id="${c.id}">Mark paid</button>` : `<button class="btn primary sm" data-act="member-retry" data-id="${c.id}">Retry card</button>`) : ''}<button class="btn sm" data-act="member-change" data-id="${c.id}">Change plan</button><button class="btn sm danger" data-act="member-cancel" data-id="${c.id}">Cancel</button></div>` : `<div class="eyebrow">Membership</div><div class="strong" style="font-size:18px">Not a member</div><p class="small muted" style="margin:6px 0 12px">Members visit 2.3× more often. ${esc(c.first)} has ${clientStats(c.id).visits} visits — ${(() => { const fit = st().plans.find((p) => !contraindications(c, p.includes).some((w) => w.level === 'bad' && w.services.length)); return fit ? `a good candidate for ${esc(fit.name)}` : `but every membership includes a service ${esc(c.first)}'s caution flags rule out`; })()}.</p>${isLive() ? '<div class="tiny faint" style="margin:-6px 0 10px">Billing isn\'t connected yet: charge the membership on your own terminal each month. Memberships are kept on this iPad for now.</div>' : ''}<div class="row wrap">${st().plans.map((p) => `<button class="btn sm primary" data-act="member-enroll" data-id="${c.id}" data-plan="${p.id}">Enroll · ${esc(p.name)} ${money(p.price, { whole: true })}/mo</button>`).join('')}</div>`}</div>
     <div class="card pad"><div class="row between"><div class="eyebrow">Card on file</div>${c.storeCredit ? `<span class="badge good">Store credit ${money(c.storeCredit)}</span>` : ''}</div>${isLive() ? `<div class="strong" style="font-size:18px">Not connected yet</div><div class="small muted" style="margin:4px 0 0">Luster will keep cards on file once card payments are set up. Until then, take payment on your own terminal and record it at checkout.</div>` : c.cardOnFile ? `<div class="strong" style="font-size:18px">${esc(c.cardOnFile.brand)} •••• ${esc(c.cardOnFile.last4)}</div><div class="small muted" style="margin:4px 0 12px">Used for memberships, no-show fees and tap-to-pay checkout.</div><button class="btn sm" data-act="card-remove" data-id="${c.id}">Remove</button>` : `<div class="strong" style="font-size:18px">None</div><div class="small muted" style="margin:4px 0 12px">Add one at checkout or send a secure link.</div><button class="btn sm" data-act="card-add" data-id="${c.id}">Add card</button>`}</div>
     <div class="card pad" style="grid-column:1/-1"><div class="eyebrow" style="margin-bottom:8px">Recent tickets</div>${st().tickets.filter((t) => t.clientId === c.id).sort(by((t) => t.closedAt)).reverse().slice(0, 6).map((t) => `<div class="row between small" style="padding:6px 0;border-bottom:1px solid var(--line-2);cursor:pointer" data-act="open-ticket" data-id="${t.id}"><span>${fmtDate(t.date)} · ${t.lines.map((l) => esc(l.name)).join(', ')}</span><span class="num strong">${money(t.total)}</span></div>`).join('') || '<div class="small muted">No tickets yet.</div>'}</div></div>`;
 }
@@ -3133,7 +3299,7 @@ Modals.compare = ({ before, after }) => {
 };
 Modals.message = ({ clientId }) => {
   const c = clientById(clientId);
-  const tpls = [`Hi ${c.first}, it's ${st().staff[0].name.split(' ')[0]} at ${st().business.name}. `, `Hi ${c.first}! We had a cancellation open up — want it? `, `Hi ${c.first}, your product came in. Want us to hold it at the desk? `, `Hi ${c.first}, ${tpl().copy.checkin} `];
+  const tpls = [`Hi ${c.first}, it's ${st().staff[0].name.split(' ')[0]} at ${st().business.name}. `, `Hi ${c.first}! We had a cancellation open up — want it? `, `Hi ${c.first}, your product came in. Want us to hold it at the desk? `, `Hi ${c.first}, ${wording('checkin')} `];
   const thread = st().messages.filter((m) => m.clientId === clientId).sort(by((m) => m.at)).slice(-6);
   return { title: `Text ${esc(fullName(c))}`, body: `${isLive() ? handoffNote(c) : ''}<div class="small muted">${c.phone ? fmtPhone(c.phone) : 'No mobile number on file'}${isLive() ? (c.email ? ` · ${esc(c.email)}` : '') : ' · replies land in Messages'}</div>${thread.length ? `<div class="col" style="gap:6px">${thread.map((m) => `<div class="bubble out">${esc(m.body)}<div class="tiny" style="opacity:.7;margin-top:2px">${timeAgo(m.at)}</div></div>${m.reply ? `<div class="bubble">${esc(m.reply)}</div>` : ''}`).join('')}</div>` : ''}<div class="row wrap" style="gap:6px">${tpls.map((t, i) => `<button class="chip" data-act="msg-tpl" data-i="${i}">${['Intro', 'Cancellation opening', 'Product arrived', 'Check-in'][i]}</button>`).join('')}</div><textarea class="textarea" id="msg-body" placeholder="Type a text…"></textarea><input type="hidden" id="msg-tpls" value="${esc(JSON.stringify(tpls))}">`, foot: isLive() ? `<button class="btn" data-act="close-modal">Cancel</button>${handoffButtons(c)}` : `<button class="btn" data-act="close-modal">Cancel</button><button class="btn primary" data-act="msg-send" data-id="${clientId}">Send text</button>`, mount(root) { setTimeout(() => $('#msg-body', root)?.focus(), 30); } };
 };
@@ -3386,7 +3552,7 @@ Views.booking = {
       const a = apptById(b.apptId); const s = a ? staffById(a.staffId) : null;
       body = a ? `<div class="confirm-tick">${I.check}</div><h3 style="text-align:center;font-family:var(--font-display);font-weight:400;font-size:26px;margin-top:12px">You're booked, ${esc(clientById(a.clientId).first)}.</h3><p class="muted" style="text-align:center">${esc(apptTitle(a))} with ${esc(s.name.split(' ')[0])}<br>${fmtDate(a.date, 'long')} · ${fmtTime(a.start)}</p><div class="alert info" style="margin-top:14px">${I.messages}<div>Confirmation texted to ${fmtPhone(clientById(a.clientId).phone)}. It's already on the studio calendar — <button class="btn sm" data-act="bk-see" data-date="${a.date}" data-id="${a.id}">see it there</button></div></div><div class="row" style="justify-content:center;margin-top:16px"><button class="btn" data-act="bk-reset">Book another</button></div>` : '<div class="empty">Something went sideways. Start over.</div>';
     }
-    return `<div class="booking-frame"><div class="booking-hero"><div class="eyebrow">${esc(biz.name)}</div><h2>${step === 5 ? 'See you soon' : 'Book a visit'}</h2><p>${step === 0 ? esc(tpl().copy.bookingIntro) : step === 1 ? 'Who would you like to see?' : step === 2 ? 'Real-time availability — if you can see it, it\'s yours.' : step === 3 ? 'Returning clients: your number pulls up your file.' : step === 4 ? 'One last look.' : ''}</p></div>${step < 5 ? stepsHtml : ''}<div>${body}</div></div>`;
+    return `<div class="booking-frame"><div class="booking-hero"><div class="eyebrow">${esc(biz.name)}</div><h2>${step === 5 ? 'See you soon' : 'Book a visit'}</h2><p>${step === 0 ? esc(wording('bookingIntro')) : step === 1 ? 'Who would you like to see?' : step === 2 ? 'Real-time availability — if you can see it, it\'s yours.' : step === 3 ? 'Returning clients: your number pulls up your file.' : step === 4 ? 'One last look.' : ''}</p></div>${step < 5 ? stepsHtml : ''}<div>${body}</div></div>`;
   },
 };
 function bkKnownHint(phone) { const d = phone.replace(/\D/g, ''); if (d.length < 10) return 'We text your confirmation and reminders here.'; const c = st().clients.find((x) => x.phone === d); return c ? `Welcome back, ${esc(c.first)} — we found your file.` : 'New here? Welcome. We\'ll send a short intake form before your visit.'; }
@@ -4034,23 +4200,27 @@ async function sendFormLink(f) {
      ?biz=hair&name=Magnolia%20Hair%20Studio&owner=Renee&team=5[&phone=…&address=…]
    biz = a TEMPLATES id. The params stay in the URL on purpose: iOS installs the page URL as the start URL and
    Chrome reads the start_url we put in the manifest below, so first launch of the installed app sees them too. */
+/* A studio's pitch link opens its real menu (32-studios.js): ?studio=simplyfacials, or a setup link with the studio's exact name. */
 function setupFromUrl() {
   let q; try { q = new URLSearchParams(location.search); } catch (e) { return null; }
-  const biz = (q.get('biz') || '').trim().toLowerCase(); if (!TEMPLATES[biz]) return null;
   const take = (k, n) => (q.get(k) || '').trim().slice(0, n);
-  return { biz, name: take('name', 48), owner: take('owner', 24), team: take('team', 2), phone: take('phone', 24), address: take('address', 80) };
+  let studio = take('studio', 32).toLowerCase(); if (!STUDIOS[studio]) studio = '';
+  const biz = studio ? STUDIOS[studio].template : take('biz', 16).toLowerCase(); if (!TEMPLATES[biz]) return null;
+  const s = { biz, studio, name: take('name', 48), owner: take('owner', 24), team: take('team', 2), phone: take('phone', 24), address: take('address', 80) };
+  if (!s.studio && s.name && !s.owner && !s.team) { const p = Object.values(STUDIOS).find((x) => x.template === biz && slugify(x.name) === slugify(s.name)); if (p) s.studio = p.id; }
+  return s;
 }
-const setupKeyOf = (s) => `${s.biz}:${slugify(s.name || TEMPLATES[s.biz].defaults.name)}`;
+const setupKeyOf = (s) => (s.studio ? `studio:${s.studio}` : `${s.biz}:${slugify(s.name || TEMPLATES[s.biz].defaults.name)}`);
 /* Runs before loadState(). Returns true when it created the workspace itself (S.state is then already set). */
 function applySetupLink() {
   const s = setupFromUrl(); if (!s) return false;
   const key = setupKeyOf(s); const existing = loadIndex();
-  const isDefault = s.biz === 'facial' && !s.owner && slugify(s.name || TEMPLATES.facial.defaults.name) === slugify(TEMPLATES.facial.defaults.name);
-  const hit = existing ? existing.find((w) => w.setupKey === key || (isDefault && w.id === 'simply')) : null;
+  const isDefault = !s.studio && s.biz === 'facial' && !s.owner && slugify(s.name || TEMPLATES.facial.defaults.name) === slugify(TEMPLATES.facial.defaults.name);
+  const hit = existing ? existing.find((w) => w.setupKey === key || (isDefault && isExampleWs(w)) || (s.studio && !w.live && w.opts && w.opts.studio === s.studio)) : null;
   if (hit) { try { localStorage.setItem(WS_CUR_KEY, hit.id); } catch (e) {} return false; }   // the link always opens that business
   if (isDefault) return false;                                                                 // the normal boot seeds the example business
   if (!existing) S.wsIndex = [];                                                               // a personalized install starts with just that business
-  const ws = createWorkspace(s.biz, { name: s.name, owner: s.owner, team: s.team, phone: s.phone, address: s.address });
+  const ws = createWorkspace(s.biz, { name: s.name, owner: s.owner, team: s.team, phone: s.phone, address: s.address, ...(s.studio ? { studio: s.studio } : {}) });
   ws.setupKey = key; saveIndex(workspaces());
   return true;
 }

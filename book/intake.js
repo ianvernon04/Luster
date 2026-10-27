@@ -27,6 +27,7 @@ function deriveIntake(a, verticalFields, today) {
   for (const f of verticalFields || []) { if (!f.flag) continue; const v = a[f.id]; const hit = Array.isArray(v) ? v.includes(f.flag.when) : v === f.flag.when; if (hit) flags.add(f.flag.k); }
   if (alg.includes('Hair dye (PPD)')) flags.add('ppd'); if (alg.includes('Acrylates (gel or acrylic nails)')) flags.add('acrylate'); if (alg.includes('Adhesives (lash glue, tape)')) flags.add('adhesive');
   if (cond.includes('Blood clots or DVT')) flags.add('dvt'); if (cond.some((x) => x.startsWith('Neuromuscular'))) flags.add('neuro'); if (cond.some((x) => x.startsWith('Recent surgery'))) flags.add('surgery');
+  if (cond.some((x) => x.startsWith('Cold sensitivity'))) flags.add('cold');
   const allergies = alg.filter((x) => x !== 'None known' && x !== 'Seasonal allergies').concat(a.allergies_other ? [a.allergies_other] : []);
   if (allergies.length) flags.add('allergy');
   const cancer = cond.includes('Cancer (current or past)') ? { type: a.cancer_type || '', status: a.cancer_status || '', tx: a.cancer_tx || [], radiationArea: a.cancer_radiation_area || '', lymph: a.cancer_lymph || '', port: a.cancer_port || '', effects: a.cancer_effects || [], clearance: a.cancer_clearance || 'Not yet', physician: a.cancer_physician || '' } : null;

@@ -24,7 +24,9 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 
 - `src/parts/` — the app, concatenated in filename order by `src/build.sh`:
   `00-head.html` · `10-styles.css` · `20-markup.html` · `30-util.js` (dates incl. `APP_TZ` business time zone, `zonedToUtc`, icons, rng)
-  · `31-templates.js` (`SEED_VERSION`, `FLAGS`, 7 vertical `TEMPLATES`) · `32-seed.js` (demo data) · `33-store.js` (state, workspaces,
+  · `31-templates.js` (`SEED_VERSION`, `FLAGS`, 7 vertical `TEMPLATES`) · `32-seed.js` (demo data) · `32-studios.js` (studio profiles:
+  a real studio's menu, prices, hours, memberships, consents and safety rules, opt-in by pitch link `?studio=<id>`; the public demo
+  is always the generic menu; profile teams are placeholder names on purpose) · `33-store.js` (state, workspaces,
   IndexedDB, mutations; `commit()` triggers cloud sync) · `34-cloud.js` (Supabase sync for live businesses) · `35-diag.js` (errors
   and sync problems on live iPads → `app_events`, scrubbed of emails/phones) · `40-shell.js` (rail,
   palette, modals, `Actions`) · `41-calendar.js` · `42-clients.js` · `43-checkout.js` · `44-booking.js` · `45-forms.js` · `46-messages.js`
@@ -49,8 +51,10 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 - Demo workspaces are local-only and seeded. A live workspace (`S.state.live`) mirrors one `businesses` row.
 - Template staff/service ids (`s1`, `sv_peel`) stay as local ids so safety rules keep working; the cloud stores them in `key`, and
   `live.ids` maps key → uuid. Clients and appointments use uuids everywhere (`newId()`).
-- Sync = pull (catalog on full syncs; clients/appointments since `lastPull` minus a 2-minute overlap) then push (every record whose
-  mapped row hash differs from `live.synced[id]`). Edits made while offline simply push later. Realtime triggers a sync; polling is the fallback.
+- Sync = pull (catalog, menu sections and form templates on full syncs; clients/appointments since `lastPull` minus a 2-minute overlap)
+  then push (every record whose mapped row hash differs from `live.synced[id]`). Edits made while offline simply push later. Realtime
+  triggers a sync; polling is the fallback. Each form template in the cloud lists the services that need it signed (`definition.services`),
+  so a second iPad asks for the same consents as the first.
 - The database refuses double-bookings (exclusion constraint). A refused push rolls the iPad back and shows a toast (`Cloud.refused`).
 - Live calendars run on the business time zone (`APP_TZ`), not the device's: the owner may be in Okinawa while the studio is in Baton Rouge.
 - In the cloud: business, team, hours, services, clients (deleted = `deleted_at` via `delete_client`, which also cancels their
@@ -67,7 +71,16 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
 
 ## Conventions
 
-- Migrations: until the first `apply_migration` to the production project, edit them in place; after that, only add new files.
+- Migrations: the four in `supabase/migrations/` were applied to production (project `rndipfzcdirenvarddws`, US East) on 2026-10-26
+  by pasting them into the SQL editor. Never edit an applied migration; add a new file.
+- Releases: build on the tag of the last deployed release (`live-*`), pack with `ops/make-release.sh`, and deliver it as an INSERT into
+  `releases` (pasted into the SQL editor; this sandbox can't reach supabase.co). The workflow reports the result back on the row.
+- Luster is made by New World Logic LLC (Louisiana); the terms, privacy page and emails name it. Account emails go
+  through Resend (`mail.nwluster.com`); templates in `supabase/templates/`, pasted into the dashboard by hand. Any new
+  service that touches personal data gets added to the privacy page's list of providers.
+- Luster is for any studio. Nothing studio-specific goes in templates, the legal pages, emails or the booking page; a studio's own
+  menu lives in a profile (`32-studios.js`), reached only through its pitch link, holding only what the studio publishes itself, with
+  placeholder staff names (the demo invents bookings and revenue per provider).
 - Bump `SEED_VERSION` only for demo-data shape changes; live workspaces are never reseeded (key `luster.live.<id>`).
 - Keep everything relative (`./`): the app runs at the domain root, under `/luster/` in tests, and inside the claude.ai artifact.
 - Vertical-specific content lives in `TEMPLATES`; views read `tpl()`.

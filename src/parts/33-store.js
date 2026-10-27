@@ -4,11 +4,21 @@ let LS_KEY = '';
 const S = { state: null, ui: null, photoUrls: new Map(), wsId: null };
 // Demo workspaces reseed when SEED_VERSION changes. Live workspaces hold real data, so their key never changes.
 const wsKey = (id) => { const w = (S.wsIndex || []).find((x) => x.id === id); return w && w.live ? `luster.live.${id}` : `luster.ws.${id}.v${SEED_VERSION}`; };
-function loadIndex() { try { const i = JSON.parse(localStorage.getItem(WS_INDEX_KEY) || '[]'); return Array.isArray(i) && i.length ? i : null; } catch (e) { return null; } }
+function loadIndex() {
+  try {
+    const i = JSON.parse(localStorage.getItem(WS_INDEX_KEY) || '[]'); if (!Array.isArray(i) || !i.length) return null;
+    // devices from before studio profiles had Simply Facials as their example business: it stays theirs, now as that studio's pitch
+    for (const w of i) if (w.id === 'simply' && w.templateId === 'facial' && w.name === 'Simply Facials' && !w.live && !(w.opts && (w.opts.name || w.opts.studio))) w.opts = { ...(w.opts || {}), studio: 'simplyfacials' };
+    return i;
+  } catch (e) { return null; }
+}
 function saveIndex(idx) { try { localStorage.setItem(WS_INDEX_KEY, JSON.stringify(idx)); } catch (e) {} }
-function workspaces() { return S.wsIndex || (S.wsIndex = loadIndex() || [{ id: 'simply', name: TEMPLATES.facial.defaults.name, templateId: 'facial', opts: {}, createdAt: todayStr() }]); }
+// the example business every new device starts with: the business type's generic menu, never a real studio's
+const isExampleWs = (w) => w.templateId === 'facial' && !w.live && !(w.opts && (w.opts.name || w.opts.studio));
+function workspaces() { return S.wsIndex || (S.wsIndex = loadIndex() || [{ id: 'demo', name: TEMPLATES.facial.defaults.name, templateId: 'facial', opts: {}, createdAt: todayStr() }]); }
 function currentWs() { return workspaces().find((w) => w.id === S.wsId) || workspaces()[0]; }
 const tpl = () => TEMPLATES[(S.state && S.state.templateId) || 'facial'];
+const wording = (k) => (S.state && S.state.copy && S.state.copy[k]) || tpl().copy[k];   // a studio profile can word things its own way
 const bizUrl = (path = '') => `${(S.state && S.state.business.slug) || 'studio'}.example${path}`;
 
 /* Workspace state lives in IndexedDB (localStorage caps out around 5 MB; one busy workspace is 2–3 MB). */
@@ -46,10 +56,11 @@ const saveNow = () => KV.set(LS_KEY, S.state);
 function resetDemo() { const ws = currentWs(); if (ws.live) return; S.state = buildInitialState(ws.templateId, ws.opts || {}); S.state.refunds ||= []; invalidateIndex(); refreshTodayStatuses(); saveState(); }
 function createWorkspace(templateId, opts) {
   Cloud.stop(); APP_TZ = null;
-  const idx = workspaces(); const id = uid('ws_'); const name = (opts.name || '').trim() || TEMPLATES[templateId].defaults.name;
+  const P = studioOf(templateId, opts.studio);
+  const idx = workspaces(); const id = uid('ws_'); const name = (opts.name || '').trim() || (P ? P.name : TEMPLATES[templateId].defaults.name);
   idx.push({ id, name, templateId, opts: { ...opts, name }, createdAt: todayStr() }); saveIndex(idx);
   try { localStorage.setItem(WS_CUR_KEY, id); } catch (e) {}
-  S.wsId = id; LS_KEY = wsKey(id); S.state = buildInitialState(templateId, opts); invalidateIndex(); refreshTodayStatuses(); saveState();
+  S.wsId = id; LS_KEY = wsKey(id); S.state = buildInitialState(templateId, { ...opts, name }); invalidateIndex(); refreshTodayStatuses(); saveState();   // same opts as every later reseed
   return idx[idx.length - 1];
 }
 async function switchWorkspace(id) {

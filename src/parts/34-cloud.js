@@ -162,10 +162,29 @@ const Cloud = {
   },
   // the studio's forms as the client's phone renders them; the business type's own intake questions are marked so the
   // phone can work out the same caution flags the iPad would (book/intake.js)
+  // each template also carries the services that need it signed first, so every device asks for the same consents
   formTemplatesPayload() {
     const vertical = new Set(((tpl().intake || {}).section || { fields: [] }).fields.map((f) => f.id));
+    const needs = st().consentFor || {};
     return (st().formTemplates || []).map((t) => ({ business_id: this.L().businessId, template_id: t.id, kind: t.kind || 'consent', name: t.name,
-      definition: { ...t, fields: t.fields.map((f) => (t.id === 'intake' && vertical.has(f.id) ? { ...f, vertical: true } : f)) } }));
+      definition: { ...t, fields: t.fields.map((f) => (t.id === 'intake' && vertical.has(f.id) ? { ...f, vertical: true } : f)), services: Object.keys(needs).filter((k) => needs[k] === t.id).sort() } }));
+  },
+  // a device opening the business from the cloud (or after another device changed them) gets the studio's own forms and
+  // which services need which consent, instead of the business type's defaults
+  async pullForms() {
+    const sb = this.sb(); const L = this.L();
+    if (L.formsHash && hashOf(this.formTemplatesPayload()) !== L.formsHash) return;   // this device's form changes aren't sent yet: they win
+    const rows = await this.fetchAll(() => sb.from('form_templates').select('template_id, kind, name, definition').eq('business_id', L.businessId).order('template_id'));
+    if (!rows.length) return;
+    const byId = new Map((st().formTemplates || []).map((t) => [t.id, t])); const needs = {}; let mapped = false;
+    for (const r of rows) {
+      const { services, ...def } = r.definition || {}; if (!Array.isArray(def.fields)) continue;
+      byId.set(r.template_id, { ...def, id: r.template_id, kind: r.kind || def.kind, name: r.name || def.name, fields: def.fields.map(({ vertical, ...f }) => f) });
+      if (Array.isArray(services)) { mapped = true; for (const k of services) needs[k] = r.template_id; }
+    }
+    st().formTemplates = Array.from(byId.values());
+    if (mapped) st().consentFor = needs;   // sent by a device that knows the mapping (older versions didn't send one)
+    L.formsHash = hashOf(this.formTemplatesPayload());
   },
   catalogPayload(state = S.state, ids = this.L().ids) {
     return {
@@ -249,7 +268,7 @@ const Cloud = {
   async pull(full) {
     const sb = this.sb(); const L = this.L(); const biz = L.businessId;
     for (const k of ['client', 'appt', 'ticket', 'refund', 'note', 'form', 'health', 'answers', 'healthAt']) L.synced[k] ||= {};
-    if (full) await this.pullCatalog();
+    if (full) { await this.pullCatalog(); await this.pullForms(); }
     const since = full ? null : L.lastPull;
     const overlap = (t) => new Date(Date.parse(t) - 120000).toISOString();   // rows can commit slightly out of timestamp order; re-reading two minutes is cheap and merges are idempotent
     const tz = this.tz(); const from = zonedToUtc(addDays(todayStr(), -180), 0, tz).toISOString();
@@ -300,7 +319,12 @@ const Cloud = {
     ]);
     const st0 = S.state;
     if (L.catalogHash && hashOf([this.catalogPayload(), this.bizRow()]) !== L.catalogHash) return;   // local menu/team edits not sent yet: push wins
-    if (bizRows[0]) { const b = bizRows[0]; Object.assign(st0.business, { name: b.name, phone: b.phone || '', address: b.address || '' }); L.slug = b.slug; L.timezone = b.timezone; APP_TZ = b.timezone; }
+    if (bizRows[0]) {
+      const b = bizRows[0]; Object.assign(st0.business, { name: b.name, phone: b.phone || '', address: b.address || '' }); L.slug = b.slug; L.timezone = b.timezone; APP_TZ = b.timezone;
+      // the menu's sections travel with the booking settings; another device (or a menu set up for the studio) may have changed them
+      const cats = b.booking && Array.isArray(b.booking.categories) ? b.booking.categories.filter((c) => c && c.key) : [];
+      if (cats.length) { st0.categories = cats.map((c) => ({ id: c.key, label: c.label || c.key })); syncCategories(st0.categories); }
+    }
     for (const v of services) {
       const key = v.key || v.id; L.ids.services[key] = v.id;
       let loc = svcById(key);
@@ -470,7 +494,7 @@ function createLiveWorkspace({ businessId, slug, timezone, ids, from }) {
 function emptyLiveState(entry, from, ids) {
   const base = from || catalogFor(entry.templateId, { name: entry.name });
   const copy = (x) => JSON.parse(JSON.stringify(x));
-  const keep = ['templateId', 'business', 'categories', 'staff', 'services', 'products', 'plans', 'formTemplates', 'consentFor', 'settings'];
+  const keep = ['templateId', 'studio', 'copy', 'business', 'categories', 'staff', 'services', 'products', 'plans', 'formTemplates', 'consentFor', 'settings'];
   const st0 = { version: SEED_VERSION, seedDay: todayStr() };
   for (const k of keep) if (base[k] !== undefined) st0[k] = copy(base[k]);
   if (!from) { st0.staff = []; st0.services = []; }
