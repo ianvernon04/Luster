@@ -44,8 +44,11 @@ Supabase backend for live businesses. The repo root is served as-is by GitHub Pa
   `build-pwa.sh`) redirects when there's no query string or hash, the app isn't installed, and the device has never opened the app
   (`luster.ws.index`). Setup/pitch links, `?demo` (the website's "Try it yourself"), `?signin` (opens sign-in; `50-app.js`), email
   links and installed iPads go straight to the app. "Request a demo" posts to `request_demo()`; requests land in `demo_requests`,
-  which only the Supabase dashboard can read. Its pictures are screenshots of the real app: `node ops/site-shots.mjs`, then
-  `python3 ops/site-images.py`, then `node ops/site-og.mjs` (link preview). The site says only what Luster does today.
+  which only the Supabase dashboard can read. Its app pictures are screenshots of the real app: `node ops/site-shots.mjs`, then
+  `python3 ops/site-images.py`, then `node ops/site-og.mjs` (link preview). Its photographs are free Unsplash photos of studios
+  (sources in `welcome/img/credits.txt`) plus Ian's own, cropped by `ops/site-photos.py` (which drops photo metadata such as GPS).
+  Stock photos set the mood only: never put a name, quote or "our studios" caption on one; real customers' photos need their
+  written OK. The site says only what Luster does today.
 - `supabase/migrations/` — the database. `supabase/test/` — PGlite harness that imitates Supabase (`harness.mjs`), a stand-in for
   Supabase's HTTP API (`server.mjs`: PostgREST tables + RPC, password auth), fixtures, and the suites above.
 - `config.js` — public Supabase URL + anon key (safe to publish; RLS decides what the key can do). `vendor/` — supabase-js UMD build

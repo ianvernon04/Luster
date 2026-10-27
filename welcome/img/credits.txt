@@ -1,0 +1,19 @@
+Photographs on nwluster.com/welcome/
+
+Studio photos: free photos from Unsplash, used under the Unsplash License (https://unsplash.com/license).
+They set the mood. They are not Luster's customers and the site never says they are.
+Each was downloaded from images.unsplash.com/<photo>?w=<width>&q=80-82&fm=jpg, then cropped by ops/site-photos.py.
+
+photo-hero.webp    photo-1733145819142-16a6732ff704  w=1600  Alexander Mass           https://unsplash.com/photos/t3vYxCdxwAM
+photo-band.webp    photo-1761839256791-6a93f89fb8b0  w=2000  Land O'Lakes, Inc.       https://unsplash.com/photos/UnSFmJCCrW0
+photo-desk.webp    photo-1657470179442-12be86434e22  w=1600  Ozkan Guner              https://unsplash.com/photos/aOnJSN230sA
+kind-skin.webp     photo-1731355771317-b2ab72c79124  w=1200  Studio Michael França    https://unsplash.com/photos/aZliw_XDfUU
+kind-medspa.webp   photo-1650803075918-efbee311735d  w=1200  Amir Seilsepour          https://unsplash.com/photos/jDem8tPXwOA
+kind-massage.webp  photo-1649751295468-953038600bef  w=1200  yury kirillov            https://unsplash.com/photos/Y1JKxNFwZx4
+kind-lash.webp     photo-1674049406467-824ea37c7184  w=1200  Bermix Studio            https://unsplash.com/photos/xA_djNkH0Yo
+kind-hair.webp     photo-1702236240794-58dc4c6895e5  w=1200  Patrick Marah            https://unsplash.com/photos/tS4DRCx3Sfw
+kind-nails.webp    photo-1632345031435-8727f6897d53  w=1200  Giorgio Trovato          https://unsplash.com/photos/gb6gtiTZKB8
+kind-barber.webp   photo-1593702275687-f8b402bf1fb5  w=1200  Michael DeMoya           https://unsplash.com/photos/Q82AM6BWBPM
+
+ian.webp, ian-face.webp: Ian Vernon's own photo, used with his permission; saved without its metadata.
+Screenshots (hero-ipad, step-*, client-file, og.jpg): the real app, from ops/site-shots.mjs.

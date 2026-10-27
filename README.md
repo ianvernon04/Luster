@@ -29,6 +29,8 @@ who's opened the app on that device before, every setup or pitch link, and the i
 
 - `https://www.nwluster.com/?demo` opens the sample studio; `https://www.nwluster.com/?signin` opens a studio's sign-in.
 - Demo requests are in Supabase → Table Editor → `demo_requests` (name, studio, how to reach them, what they use now).
+- Photos: the studio photos are free Unsplash photos (sources in `welcome/img/credits.txt`) that set the mood; they're
+  never captioned as customers. Ian's photo is his own. `python3 ops/site-photos.py <photos dir> <ian.jpg>` rebuilds them.
 
 ## Personalized install links
 

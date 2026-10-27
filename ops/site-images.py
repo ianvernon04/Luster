@@ -11,7 +11,6 @@ out = os.path.join(root, 'welcome', 'img'); os.makedirs(out, exist_ok=True)
 # name: (screenshot, crop box in screenshot pixels or None, width on the site at 2x)
 JOBS = {
     'hero-ipad':    ('ipad-calendar.png', None, 1280),
-    'hero-phone':   ('phone-booked.png', None, 440),
     'step-book':    ('phone-services.png', None, 440),
     'step-intake':  ('phone-intake.png', None, 440),
     'step-caution': ('ipad-caution.png', (1500, 0, 2360, 1236), 520),   # the appointment drawer, cautions on top

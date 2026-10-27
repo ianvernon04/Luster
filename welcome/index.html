@@ -97,18 +97,33 @@ p { margin: 0; }
 .hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .hero .note { margin-top: 14px; font-size: 14px; color: var(--ink-3); }
 .made { display: flex; align-items: center; gap: 12px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink-2); max-width: 30em; }
-.avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #2B7F8E, #143F48); color: #fff; font: 600 14px/1 var(--font-ui); letter-spacing: .02em; }
-.shots { position: relative; padding-bottom: 36px; }
+.avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: var(--accent-soft); box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px var(--line); }
 .frame { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-3); }
 .frame.phone { border-radius: 30px; border: 8px solid #1B2224; }
-.shots .phone { position: absolute; left: -40px; bottom: -8px; width: 33%; max-width: 210px; }
+/* photographs: free stock photos that set the mood (never presented as Luster's customers) and Ian's own */
+.photo { margin: 0; border-radius: 26px; overflow: hidden; background: var(--surface-2); box-shadow: var(--shadow-3); }
+.photo img { width: 100%; height: 100%; object-fit: cover; }
+/* hero: a real moment in a studio, the iPad at the desk, and the caution Luster raises */
+.shots { position: relative; padding-bottom: 64px; }
+.shots .hero-photo { width: 74%; margin-left: auto; aspect-ratio: 4 / 5; }
+.shots .ipad { position: absolute; left: 0; bottom: 0; width: 68%; }
+.pop { position: absolute; left: 0; top: 9%; display: flex; gap: 12px; align-items: center; max-width: 280px; padding: 12px 16px 12px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-3); font-size: 14px; line-height: 1.35; color: var(--ink-2); }
+.pop b { display: block; color: var(--bad); font-size: 14px; }
+.pop .ic { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--bad-soft); color: var(--bad); }
+.pop .ic svg { width: 22px; height: 22px; }
 .sparkle { position: absolute; color: var(--accent); opacity: .9; }
 .sparkle.a { width: 30px; right: -6px; top: -18px; }
 .sparkle.b { width: 16px; right: 28px; top: 22px; opacity: .6; }
 @media (max-width: 960px) {
   .hero .wrap { grid-template-columns: 1fr; gap: 44px; }
-  .shots { margin-left: 24px; }
-  .shots .phone { left: -24px; width: 31%; }
+  .shots { max-width: 620px; }
+}
+@media (max-width: 560px) {   /* a phone: the photo and the caution; the iPad is too small to read here and shows up further down */
+  .shots { padding-bottom: 34px; }
+  .shots .hero-photo { width: 92%; }
+  .shots .ipad { display: none; }
+  .pop { top: auto; bottom: 0; max-width: 260px; padding: 11px 14px 11px 11px; font-size: 13.5px; gap: 11px; }
+  .pop .ic { width: 34px; height: 34px; }
 }
 
 /* sections */
@@ -147,7 +162,26 @@ section { padding: 88px 0; }
 .ticks li { display: flex; gap: 12px; color: var(--ink-2); }
 .ticks li svg { flex: none; width: 22px; height: 22px; margin-top: 2px; color: var(--good); }
 .ticks li.caution svg { color: var(--bad); }
-@media (max-width: 900px) { .show { grid-template-columns: 1fr; gap: 36px; } }
+.duo { position: relative; padding-bottom: 104px; }   /* the iPad covers the desk, never her face */
+.duo .desk { width: 56%; margin-left: auto; aspect-ratio: 4 / 5; }
+.duo .frame { position: absolute; left: 0; bottom: 0; width: 74%; }
+@media (max-width: 900px) { .show { grid-template-columns: 1fr; gap: 36px; } .duo { max-width: 620px; } }
+@media (max-width: 560px) { .duo { padding-bottom: 118px; } .duo .desk { width: 62%; } .duo .frame { width: 84%; } }
+
+/* a photo band between sections */
+.photo-band { position: relative; padding: 0; min-height: clamp(400px, 44vw, 580px); display: flex; align-items: center; overflow: hidden; background: #16302F; }
+.photo-band img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 36%; }
+.photo-band::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(12, 28, 31, .86) 0%, rgba(12, 28, 31, .58) 34%, rgba(12, 28, 31, 0) 60%); }
+.photo-band .wrap { position: relative; z-index: 1; padding-top: 64px; padding-bottom: 64px; }
+.photo-band p { font-family: var(--font-display); color: #FFFFFF; font-size: clamp(36px, 4.4vw, 58px); line-height: 1.02; letter-spacing: -.015em; max-width: 8.6em; }
+.photo-band p em { display: block; color: #BFE3E8; }
+.photo-band small { display: block; margin-top: 18px; max-width: 24em; font: 17px/1.5 var(--font-ui); color: rgba(255, 255, 255, .86); }
+@media (max-width: 700px) {
+  .photo-band { min-height: 560px; align-items: flex-end; }
+  .photo-band img { object-position: 54% 20%; }
+  .photo-band::after { background: linear-gradient(0deg, rgba(12, 28, 31, .9) 0%, rgba(12, 28, 31, .62) 38%, rgba(12, 28, 31, 0) 66%); }
+  .photo-band .wrap { padding-bottom: 40px; }
+}
 
 /* switching */
 .moves { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: move; }
@@ -155,18 +189,28 @@ section { padding: 88px 0; }
 .move .when { display: inline-block; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
 .move p { margin-top: 6px; color: var(--ink-2); font-size: 16px; }
 @media (max-width: 900px) { .moves { grid-template-columns: 1fr; } }
-.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
-.chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 500; font-size: 16px; }
-.chip i { width: 9px; height: 9px; border-radius: 50%; }
+/* the kinds of studio, one photo each */
+.kinds { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin: 44px 0 0; padding: 0; list-style: none; }
+.kind { position: relative; aspect-ratio: 4 / 5; border-radius: 18px; overflow: hidden; background: var(--surface-2); box-shadow: var(--shadow-1); }
+.kind img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+.kind:hover img { transform: scale(1.04); }
+.kind span { position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 12px 12px; color: #FFFFFF; font-weight: 600; font-size: 14px; line-height: 1.25; background: linear-gradient(0deg, rgba(10, 22, 24, .78), rgba(10, 22, 24, 0)); }
+@media (max-width: 980px) { .kinds { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 620px) {
+  .kinds { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; margin: 36px -20px 0; padding: 0 20px 8px; scroll-padding: 0 20px; scrollbar-width: none; }
+  .kinds::-webkit-scrollbar { display: none; }
+  .kind { flex: 0 0 40%; scroll-snap-align: start; }
+}
 
 /* note from Ian */
-.note-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: start; max-width: 860px; margin: 0 auto; padding: 36px; border-radius: 24px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-1); }
-.note-card .avatar { width: 64px; height: 64px; font-size: 20px; }
+.note-card { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 40px; align-items: center; max-width: 920px; margin: 0 auto; padding: 36px 40px 36px 36px; border-radius: 24px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-1); }
+.note-card .ian { margin: 0; padding: 8px 8px 30px; background: #FFFFFF; border-radius: 6px; box-shadow: 0 2px 4px rgba(27, 34, 36, .08), 0 16px 34px rgba(27, 34, 36, .18); transform: rotate(-2.5deg); }
+.note-card .ian img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 2px; }
 .note-card h2 { font-size: clamp(30px, 3.4vw, 40px); }
 .note-card p { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
 .note-card .sign { margin-top: 18px; font-family: var(--font-display); font-size: 24px; color: var(--ink); }
 .note-card .sign span { display: block; font: 14px/1.4 var(--font-ui); color: var(--ink-3); }
-@media (max-width: 620px) { .note-card { grid-template-columns: 1fr; padding: 26px; } }
+@media (max-width: 720px) { .note-card { grid-template-columns: 1fr; gap: 30px; padding: 30px 26px 28px; } .note-card .ian { width: 64%; max-width: 230px; margin-left: 4px; } }
 
 /* founding studios */
 .band { background: var(--band); color: var(--band-ink); position: relative; overflow: hidden; }
@@ -188,6 +232,10 @@ section { padding: 88px 0; }
 /* request a demo */
 .request { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 56px; align-items: start; }
 .request .ticks { margin-top: 22px; }
+.host { display: flex; gap: 14px; align-items: center; margin-top: 28px; padding: 14px 18px 14px 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-1); max-width: 30em; }
+.host img { flex: none; width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.host p { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.host b { color: var(--ink); font-weight: 600; }
 form.rq { background: var(--surface); border: 1px solid var(--line-2); border-radius: 24px; padding: 28px; box-shadow: var(--shadow-3); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field.full { grid-column: 1 / -1; }
@@ -228,7 +276,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: cent
 footer nav { display: flex; flex-wrap: wrap; gap: 8px 22px; }
 footer a { text-decoration: none; }
 footer a:hover { color: var(--ink); text-decoration: underline; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn, summary::after, .nav { transition: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn, summary::after, .nav, .kind img { transition: none; } .kind:hover img { transform: none; } }
 </style>
 </head>
 <body>
@@ -263,12 +311,13 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
         <a class="btn ghost" href="../?demo">Try it yourself <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
       <p class="note">"Try it yourself" opens a sample studio in your browser. No sign-up.</p>
-      <div class="made"><span class="avatar" aria-hidden="true">IV</span><span>Made in Louisiana by Ian Vernon. Founding studios work with me directly, not a help desk.</span></div>
+      <div class="made"><img class="avatar" src="img/ian-face.webp" width="200" height="200" alt=""><span>Made in Louisiana by Ian Vernon. Founding studios work with me directly, not a help desk.</span></div>
     </div>
     <div class="shots">
       <svg class="sparkle a" viewBox="0 0 24 24" aria-hidden="true"><use href="#spark"/></svg><svg class="sparkle b" viewBox="0 0 24 24" aria-hidden="true"><use href="#spark"/></svg>
+      <figure class="photo hero-photo"><img src="img/photo-hero.webp" width="1000" height="1250" fetchpriority="high" alt="An esthetician smiling as she brushes a mask onto her client's face."></figure>
       <div class="frame ipad"><img src="img/hero-ipad.webp" width="1280" height="889" alt="Luster's calendar on an iPad: four providers side by side, a full day of facials, the current time marked in red."></div>
-      <div class="frame phone"><img src="img/hero-phone.webp" width="440" height="952" alt="A client's phone after booking online: You're booked, and a button to fill in their health form."></div>
+      <div class="pop" aria-hidden="true"><span class="ic"><svg><use href="#warn"/></svg></span><span><b>Caution on the 2:30 peel</b>Accutane in the last six months, from her health form.</span></div>
     </div>
   </div>
 </section>
@@ -319,6 +368,11 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
   </div>
 </section>
 
+<section class="photo-band">
+  <img src="img/photo-band.webp" width="1600" height="1066" loading="lazy" decoding="async" alt="A stylist smiling as she fastens a cape around her laughing client.">
+  <div class="wrap"><p>Less time on the screen. <em>More time with the person in the chair.</em></p><small>The forms, the cautions and the checkout are handled, so the front desk can look up.</small></div>
+</section>
+
 <section class="alt">
   <div class="wrap show">
     <div>
@@ -330,7 +384,10 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
         <li><svg aria-hidden="true"><use href="#tick"/></svg>Their visits, spending, notes and photos in one place, with what's next on the book.</li>
       </ul>
     </div>
-    <div class="frame"><img src="img/client-file.webp" width="1280" height="889" loading="lazy" alt="A client's file in Luster: an Accutane caution in red, visit count, lifetime spend, and the cautions on her upcoming appointments."></div>
+    <div class="duo">
+      <figure class="photo desk"><img src="img/photo-desk.webp" width="800" height="1000" loading="lazy" decoding="async" alt="A smiling receptionist behind a studio's front desk."></figure>
+      <div class="frame"><img src="img/client-file.webp" width="1280" height="889" loading="lazy" alt="A client's file in Luster: an Accutane caution in red, visit count, lifetime spend, and the cautions on her upcoming appointments."></div>
+    </div>
   </div>
 </section>
 
@@ -346,9 +403,15 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
       <div class="move"><span class="when">An afternoon</span><h3>Set up together</h3><p>Your menu, team, hours, consents and client list come over. Notes and allergies too. Duplicates get merged.</p></div>
       <div class="move"><span class="when">Switch day</span><h3>Go live</h3><p>Your booking link goes on your website and Instagram, and the iPad at the desk is ready for your first client.</p></div>
     </div>
-    <div class="chips" aria-label="Built for">
-      <span class="chip"><i style="background:#1baf7a"></i>Skin &amp; facial studios</span><span class="chip"><i style="background:#6250d6"></i>Med spas</span><span class="chip"><i style="background:#eda100"></i>Massage therapists</span><span class="chip"><i style="background:#e87ba4"></i>Lash &amp; brow artists</span><span class="chip"><i style="background:#2a78d6"></i>Hair salons</span><span class="chip"><i style="background:#0f9ab0"></i>Nail studios</span><span class="chip"><i style="background:#8a5a0b"></i>Barbershops</span>
-    </div>
+    <ul class="kinds" aria-label="Built for">
+      <li class="kind"><img src="img/kind-skin.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Skin &amp; facial studios</span></li>
+      <li class="kind"><img src="img/kind-medspa.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Med spas</span></li>
+      <li class="kind"><img src="img/kind-massage.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Massage therapists</span></li>
+      <li class="kind"><img src="img/kind-lash.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Lash &amp; brow artists</span></li>
+      <li class="kind"><img src="img/kind-hair.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Hair salons</span></li>
+      <li class="kind"><img src="img/kind-nails.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Nail studios</span></li>
+      <li class="kind"><img src="img/kind-barber.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span>Barbershops</span></li>
+    </ul>
     <p class="muted" style="margin-top:14px;font-size:15px">Each kind of studio starts with its own menu, intake questions and safety rules. Change anything you like.</p>
   </div>
 </section>
@@ -356,7 +419,7 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
 <section class="alt">
   <div class="wrap">
     <div class="note-card">
-      <span class="avatar" aria-hidden="true">IV</span>
+      <figure class="ian"><img src="img/ian.webp" width="640" height="800" loading="lazy" decoding="async" alt="Ian Vernon, smiling, in a navy suit under a live oak."></figure>
       <div>
         <h2>Hi, I'm Ian.</h2>
         <p>I build Luster in Louisiana for studios like yours. Small studios deserve software that's fast, careful with their clients' health, and run by someone who answers when you call.</p>
@@ -399,6 +462,7 @@ footer a:hover { color: var(--ink); text-decoration: underline; }
         <li><svg aria-hidden="true"><use href="#tick"/></svg>Your own services and prices in the demo, not a generic one.</li>
         <li><svg aria-hidden="true"><use href="#tick"/></svg>No pressure and no contract talk unless you want it.</li>
       </ul>
+      <div class="host"><img src="img/ian-face.webp" width="200" height="200" loading="lazy" alt=""><p><b>You'll talk to Ian,</b> the person who builds Luster. Not a sales rep, not a call center.</p></div>
     </div>
     <div>
       <form class="rq" id="rq" novalidate>
